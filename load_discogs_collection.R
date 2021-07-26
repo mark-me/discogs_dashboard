@@ -82,8 +82,8 @@ extract_sublists_as_df <- function(df, colname_id, colname_list){
     
     lst <- df[row, colname_list][[1]][[1]]
     lst_dfs[[row]] <- cbind(
-      id_release = df[row, colname_id],
-      bind_rows(df[row, colname_list])
+      id_release = unlist(df[row, colname_id], use.names = FALSE),
+      bind_rows(lst)
     )  
   }
 
@@ -95,13 +95,23 @@ extract_sublists_as_df <- function(df, colname_id, colname_list){
 extract_collection_artists <- function(df_collection){
 
   df_release_artists <- extract_sublists_as_df(df_collection, "id_release", "lst_artists")
-
+  df_release_artists %<>%
+    select(-anv, -join, -role, -tracks) %>% 
+    rename(id_artist = id,
+           name_artist = name,
+           api_artist = resource_url)
+  
   return(df_release_artists)
 }
 
 extract_collection_labels <- function(df_collection){
   
   df_release_labels  <- extract_sublists_as_df(df_collection, "id_release", "lst_labels")
+  df_release_labels %<>%
+    select(-entity_type, -entity_type_name) %>% 
+    rename(id_label = id,
+           name_label = name,
+           api_label = resource_url)
   
   return(df_release_labels)
 }
@@ -113,3 +123,17 @@ extract_collection_formats <- function(df_collection){
   return(df_release_formats)
 }
 
+remove_collection_item_lists <- function(df_collection){
+  
+  df_collection <- as_tibble(
+    df_collection %>% 
+      select(-starts_with("lst_")) %>% 
+      select(-starts_with("vec_")) %>% 
+      mutate_all(.funs = function(x) ifelse(is.null(x), NA, x))
+    )
+  
+  df_collection <- as_tibble(sapply(df_collection, unlist))
+  
+  
+  return(df_collection)
+}
