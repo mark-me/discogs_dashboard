@@ -38,6 +38,7 @@ extract_sublists_as_df <- function(df, colname_id, colname_list){
   }
   
   df <- bind_rows(lst_dfs)
+  names(df)[1] <- colname_id
   
   return(df)
 }
