@@ -56,13 +56,13 @@ extract_vectors_as_df <- function(df, colname_id, colname_vec, colname_dest){
       vec_id,
       vec_values ) )
     
-    names(df_split) <- c(colname_id, colname_dest)
     if(nrow(df_split) > 0){
       lst_df[[row]] <- df_split  
     }
   }
   
   df_result <- bind_rows(lst_df)
+  names(df_result) <- c(colname_id, colname_dest)
   
   return(df_result)  
 }
