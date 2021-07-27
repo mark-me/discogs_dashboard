@@ -28,10 +28,13 @@ extract_sublists_as_df <- function(df, colname_id, colname_list){
   for(row in 1:nrow(df)){
     
     lst <- df[row, colname_list][[1]][[1]]
-    lst_dfs[[row]] <- cbind(
-      id_release = unlist(df[row, colname_id], use.names = FALSE),
-      bind_rows(lst)
-    )  
+    
+    if(length(lst) > 0){
+      lst_dfs[[row]] <- cbind(
+        id_release = unlist(df[row, colname_id], use.names = FALSE),
+        bind_rows(lst)
+      )  
+    }
   }
   
   df <- bind_rows(lst_dfs)
