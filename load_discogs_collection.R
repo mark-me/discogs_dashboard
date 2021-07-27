@@ -2,16 +2,13 @@ library(httr)		# Library for scraping web data
 library(rjson)
 library(tidyverse)
 
-source("discogs_api_credentials.R")
-
 load_discogs_collection <- function(){
   
   lst_collection_releases <- list()
   
   rest_request <- paste0(
     api_discogs_config$url,
-    "/users/",
-    api_discogs_config$username,
+    "/users/", api_discogs_config$username,
     "/collection/folders/0/releases?page=1&per_page=100"
   )
   json <- GET(rest_request)
@@ -22,11 +19,8 @@ load_discogs_collection <- function(){
     
     rest_request <- paste0(
       api_discogs_config$url,
-      "/users/",
-      api_discogs_config$username,
-      "/collection/folders/0/releases?page=",
-      idx_page,
-      "&per_page=100",
+      "/users/", api_discogs_config$username,
+      "/collection/folders/0/releases?page=", idx_page, "&per_page=100",
       "&token=", api_discogs_config$token
     )
     json <- GET(rest_request)
@@ -75,23 +69,6 @@ load_discogs_collection <- function(){
   return(df_collection_item)  
 }
 
-extract_sublists_as_df <- function(df, colname_id, colname_list){
-  
-  lst_dfs <- list()
-  for(row in 1:nrow(df)){
-    
-    lst <- df[row, colname_list][[1]][[1]]
-    lst_dfs[[row]] <- cbind(
-      id_release = unlist(df[row, colname_id], use.names = FALSE),
-      bind_rows(lst)
-    )  
-  }
-
-  df <- bind_rows(lst_dfs)
-  
-  return(df)
-}
-
 extract_collection_artists <- function(df_collection){
 
   df_release_artists <- extract_sublists_as_df(df_collection, "id_release", "lst_artists")
@@ -99,7 +76,8 @@ extract_collection_artists <- function(df_collection){
     select(-anv, -join, -role, -tracks) %>% 
     rename(id_artist = id,
            name_artist = name,
-           api_artist = resource_url)
+           api_artist = resource_url) %>% 
+    mutate(id_artist = as.integer(id_artist))
   
   return(df_release_artists)
 }
@@ -111,7 +89,8 @@ extract_collection_labels <- function(df_collection){
     select(-entity_type, -entity_type_name) %>% 
     rename(id_label = id,
            name_label = name,
-           api_label = resource_url)
+           api_label = resource_url) %>% 
+    mutate(id_label = as.integer(id_label))
   
   return(df_release_labels)
 }
@@ -122,6 +101,25 @@ extract_collection_formats <- function(df_collection){
   
   return(df_release_formats)
 }
+
+extract_collection_genres <- function(df_collection){
+  
+  df_release_genres <- extract_vectors_as_df(df_collection, 
+                                             colname_id   = "id_release",
+                                             colname_vec  = "vec_genres",
+                                             colname_dest = "name_genre")
+  return(df_release_genres)
+}
+
+extract_collection_styles <- function(df_collection){
+  
+  df_release_styles <- extract_vectors_as_df(df_collection, 
+                                             colname_id   = "id_release",
+                                             colname_vec  = "vec_styles",
+                                             colname_dest = "name_style")
+  return(df_release_styles)
+}
+
 
 remove_collection_item_lists <- function(df_collection){
   
