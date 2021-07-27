@@ -97,7 +97,9 @@ extract_collection_labels <- function(df_collection){
 
 extract_collection_formats <- function(df_collection){
   
-  df_release_formats <- extract_sublists_as_df(df_collection, "id_release", "lst_formats")
+  df_release_formats <- extract_sublists_as_df(df_collection, 
+                                               colname_id   = "id_release", 
+                                               colname_list = "lst_formats")
   
   return(df_release_formats)
 }
