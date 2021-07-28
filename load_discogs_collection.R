@@ -119,13 +119,13 @@ extract_collection_styles <- function(df_collection){
 }
 
 
-remove_collection_item_lists <- function(df_collection){
+clean_collection_item_df <- function(df_collection){
   
   df_collection <- as_tibble(
     df_collection %>% 
       select(-starts_with("lst_")) %>% 
       select(-starts_with("vec_")) %>% 
-      mutate_all(.funs = function(x) ifelse(is.null(x), NA, x))
+      mutate(across(everything(), ~ifelse(.x == "NULL", NA, .x)))
     )
   
   df_collection <- as_tibble(sapply(df_collection, unlist))

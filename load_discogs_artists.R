@@ -1,11 +1,21 @@
-load_discogs_artists <- function(df_collection_artists){
+load_discogs_artists <- function(db, df_collection_artists){
 
+  name_table <- "artists"
+  
   df_artists <- df_collection_artists %>% 
     select(id_artist,
            name_artist,
            api_artist) %>% 
+    mutate(id_artist = as.character(id_artist)) %>% 
     unique() 
   
+  has_table <- dbExistsTable(db, name_table)
+  if(has_table){
+   df_previous <- dbReadTable(conn = db, name = name_table)
+   df_artists %<>%
+     anti_join(df_previous, by = "id_artist")
+  }
+
   row <- 1
   lst_artists <- list()
   lst_json    <- list()
@@ -45,11 +55,13 @@ load_discogs_artists <- function(df_collection_artists){
     }
   }
   
-  df_artist_information <- as_tibble(do.call("rbind", lst_artists))
+  df_artist_information <- as_tibble(do.call("rbind", lst_artists)) %>% 
+    filter(id_artist != "NULL")
   
   return(df_artist_information)
 }
 
+# Artist images ----
 extract_artist_images <- function(df_artists){
   
   df_artist_images <- extract_sublists_as_df(df_artists, 
@@ -64,6 +76,7 @@ extract_artist_images <- function(df_artists){
   return(df_artist_images)
 }
 
+# Artist's membership of groups ----
 extract_artist_groups <- function(df_artists){
   
   df_artist_groups <- extract_sublists_as_df(df_artists, 
@@ -80,6 +93,7 @@ extract_artist_groups <- function(df_artists){
   return(df_artist_groups)
 }
 
+# Artist alliases ----
 extract_artist_aliases <- function(df_artists){
   
   df_artist_aliases <- extract_sublists_as_df(df_artists, 
@@ -95,6 +109,7 @@ extract_artist_aliases <- function(df_artists){
   return(df_artist_aliases)
 }
 
+# Active members of bands ----
 extract_artist_members <- function(df_artists){
   
   df_artist_members <- extract_sublists_as_df(df_artists, 
@@ -111,6 +126,7 @@ extract_artist_members <- function(df_artists){
   return(df_artist_members)
 }
 
+# URLs related to the artist ----
 extract_artist_urls <- function(df_artists){
   
   df_artist_urls <- extract_vectors_as_df(df_artists, 
@@ -121,13 +137,14 @@ extract_artist_urls <- function(df_artists){
   return(df_artist_urls)
 }
 
+# Remove lists and vectors from data-frame and remove NULL's to make it a regular data frame ----
 clean_artist_df <- function(df_artists){
   
   df_artists <- as_tibble(
     df_artists %>% 
       select(-starts_with("lst_")) %>% 
       select(-starts_with("vec_")) %>% 
-      mutate_all(.funs = function(x) ifelse(is.null(x), NA, x))
+      mutate(across(everything(), ~ifelse(.x == "NULL", NA, .x)))
   )
   
   df_artists <- as_tibble(sapply(df_artists, unlist))
