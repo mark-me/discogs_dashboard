@@ -1,7 +1,3 @@
-library(httr)		# Library for scraping web data
-library(rjson)
-library(tidyverse)
-
 load_discogs_collection <- function(){
   
   lst_collection_releases <- list()
