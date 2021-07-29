@@ -1,2 +1,3 @@
 db_location: ~/Development/Datasets/discogs_dashboard
+reload_artist_discogs: FALSE
 discogs_max_calls_minute: 70
