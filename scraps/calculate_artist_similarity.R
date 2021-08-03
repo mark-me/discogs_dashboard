@@ -2,6 +2,8 @@ library(visNetwork)
 library(igraph)
 
 calculate_artist_similarity <- function(df_artists, df_collection_items){
+  
+  # Determine which members are/were part of a group
   df_members <- df_artists %>% 
     select(id_artist, name_artist) %>% 
     inner_join(df_artist_members, by = "id_artist") %>% 
@@ -11,6 +13,7 @@ calculate_artist_similarity <- function(df_artists, df_collection_items){
            type_edge = "group_member",
            type_node = "group")
   
+  # Determine the members of a group
   df_groups <- df_artists %>% 
     select(id_artist, name_artist) %>% 
     inner_join(df_artist_groups, by = "id_artist") %>% 
@@ -20,6 +23,7 @@ calculate_artist_similarity <- function(df_artists, df_collection_items){
            type_edge = "group_member",
            type_node = "artist")
   
+  # Determine aliases for artists
   df_aliases <- df_artists %>% 
     select(id_artist, name_artist) %>% 
     inner_join(df_artist_aliases, by = "id_artist") %>% 
@@ -29,12 +33,14 @@ calculate_artist_similarity <- function(df_artists, df_collection_items){
            type_edge = "alias",
            type_node = "alias")
   
+  # Get the relations between artists and collection items
   df_releases <- df_collection_items %>% 
     left_join(df_collection_artists, by = "id_release") %>% 
     select(id_artist) %>% 
     mutate(id_artist = paste0("a_", id_artist),
            qty_releases = 1)
   
+  # Create the nodes of artist cooperations network
   df_nodes_artists <- bind_rows(
     df_artists %>% 
       select(id_artist, name_artist, url_thumbnail) %>% 
@@ -56,6 +62,7 @@ calculate_artist_similarity <- function(df_artists, df_collection_items){
               qty_collection_items = sum(qty_releases, na.rm = TRUE)) %>% 
     ungroup()
   
+  # Create the links between artists based of cooperation
   df_edges_artists <- bind_rows(
     df_members  %>% select(from = id_artist, to = id_member, type_edge),
     df_groups   %>% select(from = id_group, to = id_artist, type_edge),
@@ -88,8 +95,9 @@ calculate_artist_similarity <- function(df_artists, df_collection_items){
            qty_artist = sum(qty_sim)) %>% 
     ungroup() 
   
+  # Store distances in the database
   db_discogs <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
-  dbWriteTable(db_discogs, "artists_similar", df_artists_similar, overwrite = TRUE)
+  dbWriteTable(db_discogs, "artist_distances", df_artists_similar, overwrite = TRUE)
   
   # Calculate similarity between artists based on the distances
   df_artists_similar %<>% 
