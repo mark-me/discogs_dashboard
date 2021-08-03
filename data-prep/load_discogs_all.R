@@ -36,6 +36,7 @@ if(nrow(df_artists) > 0){
   df_artist_members <- extract_artist_members(df_artists)
   df_artist_urls    <- extract_artist_urls(df_artists)
   df_artists        <- clean_artist_df(df_artists)    
+  df_artists        <- artists_add_image(df_artists, df_artist_images)
   
   # Write artist data to database
   name_table <- "artists"
@@ -61,6 +62,7 @@ if(config$reload_artist_releases_discogs){
 } 
 
 # Read artist data from database
+df_artists         <- dbReadTable(db_discogs, "artists")
 df_artist_images   <- dbReadTable(db_discogs, "artist_images")
 df_artist_groups   <- dbReadTable(db_discogs, "artist_groups")
 df_artist_aliases  <- dbReadTable(db_discogs, "artist_aliases")

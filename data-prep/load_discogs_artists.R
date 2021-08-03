@@ -6,7 +6,6 @@ load_discogs_artists <- function(db, df_collection_artists){
     select(id_artist,
            name_artist,
            api_artist) %>% 
-    mutate(id_artist = as.character(id_artist)) %>% 
     unique() 
   
   has_table <- dbExistsTable(db, name_table)
@@ -69,6 +68,7 @@ extract_artist_images <- function(df_artists){
                                              colname_list = "lst_images")
   
   df_artist_images %<>% 
+    mutate(id_artist = as.character(id_artist)) %>% 
     rename(type_image    = type,
            url_image     = uri,
            url_image_150 = uri150)
@@ -84,6 +84,8 @@ extract_artist_groups <- function(df_artists){
                                              colname_list = "lst_groups")
   
   df_artist_groups %<>% 
+    mutate(id_artist = as.character(id_artist),
+           id = as.character(id)) %>% 
     rename(id_group      = id,
            name_group    = name,
            api_group     = resource_url,
@@ -100,7 +102,9 @@ extract_artist_aliases <- function(df_artists){
                                               colname_id   = "id_artist",
                                               colname_list = "lst_aliases")
   
-  df_artist_aliases %<>% 
+  df_artist_aliases %<>%
+    mutate(id_artist = as.character(id_artist),
+           id = as.character(id)) %>% 
     rename(id_alias      = id,
            name_alias    = name,
            api_alias     = resource_url,
@@ -117,6 +121,8 @@ extract_artist_members <- function(df_artists){
                                               colname_list = "lst_members")
   
   df_artist_members %<>% 
+    mutate(id_artist = as.character(id_artist),
+           id = as.character(id)) %>% 
     rename(id_member     = id,
            name_member   = name,
            api_member    = resource_url,
@@ -149,6 +155,22 @@ clean_artist_df <- function(df_artists){
   
   df_artists <- as_tibble(sapply(df_artists, unlist))
   
+  
+  return(df_artists)
+}
+
+artists_add_image <- function(df_artists, df_artist_images){
+  
+  df_image <- df_artists %>% 
+    inner_join(df_artist_images, by = "id_artist") %>%
+    arrange(id_artist, type_image) %>% 
+    group_by(id_artist) %>% 
+    summarise(url_image = first(url_image),
+              url_thumbnail = first(url_image_150)) %>% 
+    ungroup() 
+  
+  df_artists %<>%
+    left_join(df_image, by = "id_artist")
   
   return(df_artists)
 }

@@ -32,6 +32,12 @@ load_discogs_artist_releases <- function(db, df_artists){
   }  
   
   df_releases <- bind_rows(lst_releases) %>% 
+    rename(id_release = id,
+           id_release_main = main_release,
+           api_release = resource_url,
+           image_thumbnail = thumb) %>% 
+    mutate(id_release = as.character(id_release),
+           id_release_main = as.character(id_release_main)) %>% 
     unique()
   return(df_releases)
 }

@@ -70,10 +70,11 @@ extract_collection_artists <- function(df_collection){
   df_release_artists <- extract_sublists_as_df(df_collection, "id_release", "lst_artists")
   df_release_artists %<>%
     select(-anv, -join, -role, -tracks) %>% 
+    mutate(id = as.character(id),
+           id_release = as.character(id_release)) %>% 
     rename(id_artist = id,
            name_artist = name,
-           api_artist = resource_url) %>% 
-    mutate(id_artist = as.integer(id_artist))
+           api_artist = resource_url) 
   
   return(df_release_artists)
 }
@@ -86,7 +87,7 @@ extract_collection_labels <- function(df_collection){
     rename(id_label = id,
            name_label = name,
            api_label = resource_url) %>% 
-    mutate(id_label = as.integer(id_label))
+    mutate(id_release = as.character(id_release))
   
   return(df_release_labels)
 }
@@ -96,6 +97,7 @@ extract_collection_formats <- function(df_collection){
   df_release_formats <- extract_sublists_as_df(df_collection, 
                                                colname_id   = "id_release", 
                                                colname_list = "lst_formats")
+  df_release_formats %<>% mutate(id_release = as.character(id_release))
   
   return(df_release_formats)
 }
