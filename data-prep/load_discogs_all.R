@@ -6,9 +6,9 @@ library(yaml)
 library(RSQLite)
 
 config <- read_yaml("config.yml")
-source("discogs_helper_functions.R")
-source("load_discogs_collection.R")
-source("load_discogs_artists.R")
+source("data-prep/discogs_helper_functions.R")
+source("data-prep/load_discogs_collection.R")
+source("data-prep/load_discogs_artists.R")
 
 df_collection_items   <- load_discogs_collection()
 df_collection_artists <- extract_collection_artists(df_collection_items)

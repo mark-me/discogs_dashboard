@@ -52,11 +52,25 @@ calculate_artist_similarity <- function(df_artists, df_collection_items,
         select(id_artist = id_alias,  name_artist = name_alias, url_thumbnail, type_node),
     )
     
+    # Make sure the nodes are unique
     df_nodes_artists %<>% 
       group_by(id_artist, name_artist) %>% 
       summarise(url_thumbnail = max(url_thumbnail),
                 type_node = max(type_node)) %>% 
       ungroup()
+    
+    # Adding indicator whether there is a release of the artist in the user's collection
+         # Added to speed up the distance calculation process for calculating distances only between
+         # the artists which are in the user's collection
+    df_node_artist_collection <- df_nodes_artists %>% 
+      semi_join((df_collection_artists %>% mutate(id_artist = paste0("a_", id_artist))), 
+                by = "id_artist") %>% 
+      select(id_artist) %>% 
+      mutate(in_collection = TRUE)
+    
+    df_nodes_artists %<>% 
+      left_join(df_node_artist_collection, by = "id_artist") %<>% 
+      mutate(in_collection = ifelse(is.na(in_collection), FALSE, in_collection))
     
     # Create the links between artists based of cooperation
     df_edges_artists <- bind_rows(
@@ -85,13 +99,16 @@ calculate_artist_similarity <- function(df_artists, df_collection_items,
     idx_artists <- 0
     for(sub_graph in lst_sub_graph){
       
+      idx_collection_artists <- V(sub_graph)[V(sub_graph)$in_collection]$name
       # Calculate shortest distances between all artists in a sub-graph
       lst_sub_artists <- foreach(
-        i = 1:length(V(sub_graph))
+        i = idx_collection_artists
       ) %dopar% {
         tibble(id_artists_similar = V(sub_graph)$name,
-               id_artist = rep(V(sub_graph)[[i]]$name, length(V(sub_graph))),
-               qty_sim = all_shortest_paths(sub_graph, from = V(sub_graph)[[i]])$nrgeo)
+               id_artist = rep(V(sub_graph)[[i]]$name, 
+                               length(V(sub_graph))),
+               qty_hops  = all_shortest_paths(sub_graph, 
+                                              from = V(sub_graph)[[i]])$nrgeo)
       }
       lst_artist <- c(lst_artist, lst_sub_artists)
     }
@@ -99,11 +116,8 @@ calculate_artist_similarity <- function(df_artists, df_collection_items,
       
 
     df_artists_similar <- bind_rows(lst_artist) %>% 
-      mutate(qty_sim = ifelse(id_artist == id_artists_similar, 0, qty_sim)) %>% 
-      group_by(id_artist) %>% 
-      mutate(perc_sim = qty_sim/sum(qty_sim),
-             qty_artist = sum(qty_sim)) %>% 
-      ungroup() 
+      #rename(qty_hops = qty_sim) %>% 
+      mutate(qty_hops = ifelse(id_artist == id_artists_similar, 0, qty_hops)) 
     
     # Store distances in the database
     db_discogs <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
@@ -115,28 +129,20 @@ calculate_artist_similarity <- function(df_artists, df_collection_items,
     df_artists_similar <- dbReadTable(db_discogs, "artist_distances")
   }
 
-  # Create similarity matrix between artists based on the distances
+  # Removing artists which are not in the user's collection
   df_artists_similar %<>% 
-    pivot_wider(id_cols = id_artist, names_from = id_artists_similar, values_from = perc_sim)
+    filter(id_artists_similar != id_artist) %>% 
+    semi_join((df_node_artist_collection %>% filter(in_collection)), 
+              by = "id_artist") %>% 
+    semi_join((df_node_artist_collection %>% filter(in_collection)), 
+              by = c("id_artists_similar" = "id_artist")) 
 
-  # Get the relations between artists and collection items
-  df_releases <- df_collection_items %>% 
-    left_join(df_collection_artists, by = "id_release") %>% 
-    select(id_artist) %>% 
-    mutate(id_artist = paste0("a_", id_artist),
-           qty_releases = 1)
-  
-  df_nodes_artists %<>% 
-    left_join(df_releases, by = "id_artist") %>% 
-    group_by(id_artist, name_artist) %>% 
-    summarise(url_thumbnail = max(url_thumbnail),
-              type_node     = max(type_node, na.rm = TRUE),
-              qty_collection_items = sum(qty_releases, na.rm = TRUE)) %>% 
-    ungroup()
-  
-  df_artists_similar %<>%
-    left_join(df_nodes_artists, by = "id_artist")
-  
+  # Create similarity matrix between artists based on the distances
+  mat_distances <- df_artists_similar %>% 
+    pivot_wider(id_cols = id_artist, names_from = id_artists_similar, values_from = qty_hops,
+                values_fill = 0) 
+
+
   return(df_artists_similar)
 }
 
