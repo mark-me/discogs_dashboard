@@ -76,26 +76,27 @@ calculate_artist_similarity <- function(df_artists, df_collection_items,
     lst_sub_graph <- decompose(graphs_artists)
     qty_artists_sub_graph <- lengths(lapply(lst_sub_graph, '[[') )
     
-    # Remove unconnected artists (hoping to reduce calculation times)
-    lst_sub_graph[qty_artists_sub_graph == 1] <- NULL
-    qty_artists_sub_graph <- qty_artists_sub_graph[qty_artists_sub_graph != 1]
+    # Setting up parallel processing
+    qty_cores <- parallel::detectCores() - 2
+    calc_cluster <- parallel::makeCluster(qty_cores, type = "FORK")
+    doParallel::registerDoParallel(cl = calc_cluster)
     
-    pb_artists <- txtProgressBar(min = 0, max = sum(qty_artists_sub_graph), style = 3)
     lst_artist <- list()
     idx_artists <- 0
     for(sub_graph in lst_sub_graph){
-
-      for(i in 1:length(V(sub_graph))){
-        
-        idx_artists <- idx_artists + 1
-        setTxtProgressBar(pb_artists, value = idx_artists)
-        lst_artist[[idx_artists]] <- tibble(
-          id_artists_similar = V(sub_graph)$name,
-          id_artist = rep(V(sub_graph)[[i]]$name, length(V(sub_graph))),
-          qty_sim = all_shortest_paths(sub_graph, from = V(sub_graph)[[i]])$nrgeo
-        )
-      }       
+      
+      # Calculate shortest distances between all artists in a sub-graph
+      lst_sub_artists <- foreach(
+        i = 1:length(V(sub_graph))
+      ) %dopar% {
+        tibble(id_artists_similar = V(sub_graph)$name,
+               id_artist = rep(V(sub_graph)[[i]]$name, length(V(sub_graph))),
+               qty_sim = all_shortest_paths(sub_graph, from = V(sub_graph)[[i]])$nrgeo)
+      }
+      lst_artist <- c(lst_artist, lst_sub_artists)
     }
+    parallel::stopCluster(cl = calc_cluster) # Stop parallel cluster
+      
 
     df_artists_similar <- bind_rows(lst_artist) %>% 
       mutate(qty_sim = ifelse(id_artist == id_artists_similar, 0, qty_sim)) %>% 
