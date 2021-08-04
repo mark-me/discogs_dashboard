@@ -125,6 +125,7 @@ calculate_artist_similarity <- function(df_artists, df_collection_items,
     
   } else {
     
+    # Read similarities from database
     db_discogs <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
     df_artists_similar <- dbReadTable(db_discogs, "artist_distances")
   }
