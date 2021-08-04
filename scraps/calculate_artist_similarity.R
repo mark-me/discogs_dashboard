@@ -1,5 +1,7 @@
 library(visNetwork)
 library(igraph)
+library(foreach)
+library(doParallel)
 
 calculate_artist_similarity <- function(df_artists, df_collection_items, 
                                         df_artist_members, df_artist_groups, df_artist_aliases,
@@ -50,6 +52,12 @@ calculate_artist_similarity <- function(df_artists, df_collection_items,
         select(id_artist = id_alias,  name_artist = name_alias, url_thumbnail, type_node),
     )
     
+    df_nodes_artists %<>% 
+      group_by(id_artist, name_artist) %>% 
+      summarise(url_thumbnail = max(url_thumbnail),
+                type_node = max(type_node)) %>% 
+      ungroup()
+    
     # Create the links between artists based of cooperation
     df_edges_artists <- bind_rows(
       df_members  %>% select(from = id_artist, to = id_member, type_edge),
@@ -63,19 +71,32 @@ calculate_artist_similarity <- function(df_artists, df_collection_items,
     graphs_artists <- graph_from_data_frame(df_edges_artists, vertices = df_nodes_artists, directed = FALSE)
     
     # Calculate shortest distances between artists
-    lst_artist <- list()
-    qty_artists <- length(V(graphs_artists))
-    pb <- txtProgressBar(min = 0, max = qty_artists, style = 3)
-    for(i in 1:qty_artists){
-      
-      setTxtProgressBar(pb, value = i)
-      lst_artist[[i]] <- tibble(
-        id_artists_similar = V(graphs_artists)$name,
-        id_artist = rep(V(graphs_artists)[[i]]$name, length(V(graphs_artists))),
-        qty_sim = all_shortest_paths(graphs_artists, from = V(graphs_artists)[[i]])$nrgeo  
-      )
-    }
     
+    # Get sub-graphs of interconnected artists
+    lst_sub_graph <- decompose(graphs_artists)
+    qty_artists_sub_graph <- lengths(lapply(lst_sub_graph, '[[') )
+    
+    # Remove unconnected artists (hoping to reduce calculation times)
+    lst_sub_graph[qty_artists_sub_graph == 1] <- NULL
+    qty_artists_sub_graph <- qty_artists_sub_graph[qty_artists_sub_graph != 1]
+    
+    pb_artists <- txtProgressBar(min = 0, max = sum(qty_artists_sub_graph), style = 3)
+    lst_artist <- list()
+    idx_artists <- 0
+    for(sub_graph in lst_sub_graph){
+
+      for(i in 1:length(V(sub_graph))){
+        
+        idx_artists <- idx_artists + 1
+        setTxtProgressBar(pb_artists, value = idx_artists)
+        lst_artist[[idx_artists]] <- tibble(
+          id_artists_similar = V(sub_graph)$name,
+          id_artist = rep(V(sub_graph)[[i]]$name, length(V(sub_graph))),
+          qty_sim = all_shortest_paths(sub_graph, from = V(sub_graph)[[i]])$nrgeo
+        )
+      }       
+    }
+
     df_artists_similar <- bind_rows(lst_artist) %>% 
       mutate(qty_sim = ifelse(id_artist == id_artists_similar, 0, qty_sim)) %>% 
       group_by(id_artist) %>% 
