@@ -102,13 +102,15 @@ extract_artist_aliases <- function(df_artists){
                                               colname_id   = "id_artist",
                                               colname_list = "lst_aliases")
   
-  df_artist_aliases %<>%
-    mutate(id_artist = as.character(id_artist),
-           id = as.character(id)) %>% 
-    rename(id_alias      = id,
-           name_alias    = name,
-           api_alias     = resource_url,
-           url_thumbnail = thumbnail_url)
+  if(nrow(df_artist_aliases) > 0){
+    
+    df_artist_aliases %<>%
+      mutate(id_artist = as.character(id_artist),
+             id_alias = as.character(id)) %>% 
+      rename(name_alias    = name,
+             api_alias     = resource_url,
+             url_thumbnail = thumbnail_url)
+  }
   
   return(df_artist_aliases)
 }

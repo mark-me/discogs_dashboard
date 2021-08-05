@@ -2,6 +2,7 @@ library(visNetwork)
 library(igraph)
 library(foreach)
 library(doParallel)
+source("data-prep/load_discogs_all.R")
 
 calculate_artist_similarity <- function(df_artists, df_collection_items, 
                                         df_artist_members, df_artist_groups, df_artist_aliases,
@@ -143,7 +144,18 @@ calculate_artist_similarity <- function(df_artists, df_collection_items,
     pivot_wider(id_cols = id_artist, names_from = id_artists_similar, values_from = qty_hops,
                 values_fill = 0) 
 
-
-  return(df_artists_similar)
+  dist_artists <- dist(mat_distances[, -1], method = "manhattan")
+  mat_distance <- as.matrix(dist_artists) 
+  
+  mds_artists <- cmdscale(mat_distance)
+  
+  df_artist_mds <- tibble(
+    id_artist = mat_distances$id_artist,
+    x = mds_artists[, 1],
+    y = mds_artists[, 2]
+  ) 
+  
+  
+  return(df_artist_mds)
 }
 
