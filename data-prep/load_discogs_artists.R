@@ -66,12 +66,14 @@ extract_artist_images <- function(df_artists){
   df_artist_images <- extract_sublists_as_df(df_artists, 
                                              colname_id   = "id_artist",
                                              colname_list = "lst_images")
-  
-  df_artist_images %<>% 
-    mutate(id_artist = as.character(id_artist)) %>% 
-    rename(type_image    = type,
-           url_image     = uri,
-           url_image_150 = uri150)
+  if(nrow(df_artist_images) > 0){
+    
+    df_artist_images %<>% 
+      mutate(id_artist = as.character(id_artist)) %>% 
+      rename(type_image    = type,
+             url_image     = uri,
+             url_image_150 = uri150)
+  }
   
   return(df_artist_images)
 }
@@ -83,14 +85,17 @@ extract_artist_groups <- function(df_artists){
                                              colname_id   = "id_artist",
                                              colname_list = "lst_groups")
   
-  df_artist_groups %<>% 
-    mutate(id_artist = as.character(id_artist),
-           id = as.character(id)) %>% 
-    rename(id_group      = id,
-           name_group    = name,
-           api_group     = resource_url,
-           is_active     = active,
-           url_thumbnail = thumbnail_url)
+  if(nrow(df_artist_groups) > 0){
+    
+    df_artist_groups %<>% 
+      mutate(id_artist = as.character(id_artist),
+             id = as.character(id)) %>% 
+      rename(id_group      = id,
+             name_group    = name,
+             api_group     = resource_url,
+             is_active     = active,
+             url_thumbnail = thumbnail_url)
+  }
   
   return(df_artist_groups)
 }
@@ -122,14 +127,17 @@ extract_artist_members <- function(df_artists){
                                               colname_id   = "id_artist",
                                               colname_list = "lst_members")
   
-  df_artist_members %<>% 
-    mutate(id_artist = as.character(id_artist),
-           id = as.character(id)) %>% 
-    rename(id_member     = id,
-           name_member   = name,
-           api_member    = resource_url,
-           is_active     = active,
-           url_thumbnail = thumbnail_url)
+  if(nrow(df_artist_members) > 0){
+
+    df_artist_members %<>% 
+      mutate(id_artist = as.character(id_artist),
+             id = as.character(id)) %>% 
+      rename(id_member     = id,
+             name_member   = name,
+             api_member    = resource_url,
+             is_active     = active,
+             url_thumbnail = thumbnail_url)
+  }
   
   return(df_artist_members)
 }
