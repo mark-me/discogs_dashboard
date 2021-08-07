@@ -24,8 +24,10 @@ get_collection_network <- function(){
 }
 
 
-get_collection_nodes <- function(){
+get_release_nodes <- function(){
 
+  df_release <- get_release_nodes() %>% 
+    mutate(type_node = "release")
   df_item <- get_item_nodes() %>% 
     mutate(type_node = "collection_item")
   df_perf <- get_performer_nodes() %>% 
@@ -163,6 +165,24 @@ get_item_nodes <- function(){
   return(df_result)  
 }
 
+get_release_nodes <- function(){
+  
+  db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
+  
+  res <- dbSendQuery(db_conn, paste0("SELECT * FROM artist_releases"))
+  df_result <- dbFetch(res)
+  
+  df_result %<>% 
+    select(-starts_with("api_")) %>% 
+    select(id_node = id_release, name_node = title, url_image = image_thumbnail, everything()) %>% 
+    mutate(type_release = "release",
+           id_node = paste0("r_", id_node))
+  
+  dbDisconnect(db_conn)
+  
+  return(df_result)  
+}
+
 # Edges ----
 get_membership_edges <- function(){
   
@@ -223,6 +243,24 @@ get_collection_item_edges <- function(){
   db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
   
   res <- dbSendQuery(db_conn, paste0("SELECT id_artist, id_release FROM collection_artists"))
+  df_result <- dbFetch(res)
+  
+  df_result %<>% 
+    select(from = id_artist,  to = id_release) %>% 
+    mutate(type_edge = "release",
+           from = paste0("p_", from),
+           to = paste0("r_", to))
+  
+  dbDisconnect(db_conn)
+  
+  return(df_result)  
+}
+
+get_release_edges <- function(){
+  
+  db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
+  
+  res <- dbSendQuery(db_conn, paste0("SELECT id_artist, id_release FROM artist_releases"))
   df_result <- dbFetch(res)
   
   df_result %<>% 
