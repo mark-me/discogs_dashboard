@@ -4,11 +4,12 @@ library(tidyverse)
 library(magrittr)
 library(yaml)
 library(RSQLite)
+library(igraph)
 
 config <- read_yaml("config.yml")
-source("data-prep/get_data_functions.R")
+source("data-prep/get_network_data_functions.R")
 
-lst_network <- get_collection_network()
+lst_network <- get_release_network()
 
 graph_all <- graph_from_data_frame(lst_network$df_edges, 
                                    vertices = lst_network$df_nodes, 
@@ -16,7 +17,7 @@ graph_all <- graph_from_data_frame(lst_network$df_edges,
 
 # Removing irrelevant nodes from the network
 performers_with_release <- V(graph_all)$qty_releases > 0
-collection_items <- V(graph_all)$type_node == "collection_item"
+collection_items <- V(graph_all)$type_node == "release"
 qty_node_edges <- degree(graph_all)
 multiple_edges <- V(graph_all)$name %in% names(qty_node_edges[qty_node_edges > 1])
 keep <- performers_with_release | collection_items | multiple_edges

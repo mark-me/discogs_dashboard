@@ -1,7 +1,42 @@
+# Networks ----
+get_release_network <- function(){
+
+  nw_performers <- get_performer_network()
+  
+  df_nodes <- bind_rows(nw_performers$df_nodes, 
+                        get_master_nodes() %>% mutate(type_node = "release"))
+
+  df_edges <- bind_rows(nw_performers$df_edges, 
+                        get_master_edges())
+  
+  df_edges %<>% 
+    filter(from %in% df_nodes$id_node)
+  
+  # Find the number of releases per performer
+  cols_nodes <- names(df_nodes)
+  df_nodes %<>% 
+    left_join(select(df_edges, from, type_edge) 
+              %>% filter(type_edge == "release"),
+              by = c("id_node" = "from")) %>% 
+    mutate(is_release = as.integer(type_edge == "release")) %>% 
+    group_by(across(one_of(cols_nodes))) %>% 
+    summarise(qty_releases = sum(is_release, na.rm = TRUE)) %>% 
+    ungroup()
+  
+  lst_network <- list(
+    df_nodes = df_nodes,
+    df_edges = df_edges
+  )
+  
+  return(lst_network)
+}
+
 get_collection_network <- function(){
   
-  df_nodes <- get_collection_nodes()
-  df_edges <- get_collection_edges() %>% 
+  df_nodes <- bind_rows(get_performer_nodes() %>% mutate(type_node = "performer"),
+                        get_item_nodes() %>% mutate(type_node = "collection_item"))
+  df_edges <- bind_rows(get_performer_edges(),
+                        get_collection_item_edges()) %>% 
     filter(from %in% df_nodes$id_node)
   
   # Find the number of releases per performer
@@ -23,56 +58,33 @@ get_collection_network <- function(){
   return(lst_network)
 }
 
-
-get_release_nodes <- function(){
-
-  df_release <- get_release_nodes() %>% 
-    mutate(type_node = "release")
-  df_item <- get_item_nodes() %>% 
-    mutate(type_node = "collection_item")
-  df_perf <- get_performer_nodes() %>% 
-    mutate(type_node = "performer")  
+get_performer_network <- function(){
   
-  df_result <- bind_rows(df_perf, df_item)
+  df_nodes <- bind_rows(
+    get_artist_nodes(),
+    get_member_nodes(),
+    get_group_nodes(),
+    get_alias_nodes()
+  )
   
-  return(df_result)
-}
-
-get_collection_edges <- function(){
-  
-  df_item <- get_collection_item_edges()
-  df_perf <- get_performer_edges()  
-
-  df_result <- bind_rows(df_perf, df_item)
-  
-  return(df_result)
-}
-
-get_performer_nodes <- function(){
-  
-  df_art  <- get_artist_nodes()
-  df_mem  <- get_member_nodes()
-  df_grp  <- get_group_nodes()
-  df_aka  <- get_alias_nodes()
-  
-  df_result <- bind_rows(df_art, df_mem, df_grp) %>% 
+  df_nodes %<>%
     group_by(id_node, name_node) %>% 
     summarise(across(name_artist_real:is_active, ~ min(.x, na.rm= TRUE))) %>% 
-    ungroup()
+    ungroup() %>% 
+    mutate(type_node = "performer")
   
-  return(df_result)
-}
-
-get_performer_edges <- function(){
+  df_edges <- bind_rows(
+    get_membership_edges(),
+    get_group_edges(),
+    get_alias_edges()
+  ) %>% unique()
   
-  df_mem <- get_membership_edges()
-  df_grp <- get_group_edges()
-  df_aka <- get_alias_edges()
-
-  df_result <- bind_rows(df_mem, df_grp) %>% 
-    unique()
+  lst_network <- list(
+    df_nodes = df_nodes,
+    df_edges = df_edges
+  )
   
-  return(df_result)
+  return(lst_network)  
 }
 
 # Nodes ----
@@ -147,7 +159,7 @@ get_alias_nodes <- function(){
   return(df_result)  
 }
 
-get_item_nodes <- function(){
+get_collection_item_nodes <- function(){
   
   db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
   
@@ -165,19 +177,27 @@ get_item_nodes <- function(){
   return(df_result)  
 }
 
-get_release_nodes <- function(){
+get_master_nodes <- function(){
   
   db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
   
-  res <- dbSendQuery(db_conn, paste0("SELECT * FROM artist_releases"))
+  res <- dbSendQuery(db_conn, paste0("SELECT artist_releases.*, collection_items.id_instance
+                                   FROM artist_releases
+                                   LEFT JOIN collection_items
+                                     ON artist_releases.id_release = collection_items.id_release"))
   df_result <- dbFetch(res)
   
   df_result %<>% 
-    select(-starts_with("api_")) %>% 
-    select(id_node = id_release, name_node = title, url_image = image_thumbnail, everything()) %>% 
+    mutate(in_collection = !is.na(id_instance)) %>% 
+    rename(id_node = id_release_main) %>% 
+    group_by(id_node) %>% 
+    summarise(title = first(title, order_by = year) ,
+              year = min(year, na.rm = TRUE),
+              in_collection = max(in_collection),
+              url_thumbnail = first(image_thumbnail, order_by = year)) %>% 
+    ungroup() %>% 
     mutate(type_release = "release",
-           id_node = paste0("r_", id_node))
-  
+           id_node = paste0("r_", id_node))  
   dbDisconnect(db_conn)
   
   return(df_result)  
@@ -256,15 +276,16 @@ get_collection_item_edges <- function(){
   return(df_result)  
 }
 
-get_release_edges <- function(){
+get_master_edges <- function(){
   
   db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
   
-  res <- dbSendQuery(db_conn, paste0("SELECT id_artist, id_release FROM artist_releases"))
+  res <- dbSendQuery(db_conn, paste0("SELECT DISTINCT id_artist, id_release_main 
+                                     FROM artist_releases"))
   df_result <- dbFetch(res)
   
   df_result %<>% 
-    select(from = id_artist,  to = id_release) %>% 
+    select(from = id_artist,  to = id_release_main) %>% 
     mutate(type_edge = "release",
            from = paste0("p_", from),
            to = paste0("r_", to))
