@@ -181,17 +181,18 @@ get_master_nodes <- function(){
   
   db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
   
-  res <- dbSendQuery(db_conn, paste0("SELECT artist_releases.*, collection_items.id_instance
-                                   FROM artist_releases
-                                   LEFT JOIN collection_items
-                                     ON artist_releases.id_release = collection_items.id_release"))
+  res <- dbSendQuery(db_conn, paste0("SELECT artist_releases.*, collection_items.id_instance 
+                                      FROM artist_releases
+                                      LEFT JOIN collection_items
+                                        ON artist_releases.id_release = collection_items.id_master"))
   df_result <- dbFetch(res)
   
   df_result %<>% 
+    filter(role %in% c("Main", "Producer", "Co-producer", "Mixed by", "Remix")) %>% 
     mutate(in_collection = !is.na(id_instance)) %>% 
-    rename(id_node = id_release_main) %>% 
+    rename(id_node = id_release) %>% 
     group_by(id_node) %>% 
-    summarise(title = first(title, order_by = year) ,
+    summarise(name_node = first(title, order_by = year) ,
               year = min(year, na.rm = TRUE),
               in_collection = max(in_collection),
               url_thumbnail = first(image_thumbnail, order_by = year)) %>% 
@@ -280,12 +281,13 @@ get_master_edges <- function(){
   
   db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
   
-  res <- dbSendQuery(db_conn, paste0("SELECT DISTINCT id_artist, id_release_main 
+  res <- dbSendQuery(db_conn, paste0("SELECT DISTINCT id_artist, id_release, role
                                      FROM artist_releases"))
   df_result <- dbFetch(res)
   
   df_result %<>% 
-    select(from = id_artist,  to = id_release_main) %>% 
+    filter(role %in% c("Main", "Producer", "Co-producer", "Mixed by", "Remix")) %>% 
+    select(from = id_artist,  to = id_release) %>% 
     mutate(type_edge = "release",
            from = paste0("p_", from),
            to = paste0("r_", to))

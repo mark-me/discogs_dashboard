@@ -17,13 +17,16 @@ graph_all <- graph_from_data_frame(lst_network$df_edges,
 
 # Removing irrelevant nodes from the network
 performers_with_release <- V(graph_all)$qty_releases > 0
-collection_items <- V(graph_all)$type_node == "release"
 qty_node_edges <- degree(graph_all)
 multiple_edges <- V(graph_all)$name %in% names(qty_node_edges[qty_node_edges > 1])
-keep <- performers_with_release | collection_items | multiple_edges
+keep <- performers_with_release | multiple_edges
 remove <- !keep
 
 graph_reduced <- delete_vertices(graph_all, V(graph_all)[remove])
+
+clust <- cluster_edge_betweenness(graph_reduced, directed = FALSE)
+V(graph_reduced)[names(membership(clust))]$community <- membership(clust)
+
 
 # qty_node_edges <- degree(graph_reduced)
 # table(qty_node_edges)
@@ -32,11 +35,9 @@ graph_reduced <- delete_vertices(graph_all, V(graph_all)[remove])
 
 # Get sub-graphs of interconnected nodes
 lst_sub_graph <- decompose(graph_reduced)
-qty_nodes_sub_graph <- lengths(lapply(lst_sub_graph, '[[') )
+qty_nodes_sub_graph <- lengths(lapply(lst_sub_graph, '[['))
+sub_graph_reduced <- lst_sub_graph[[30]]
 
-sub_graph_reduced <- lst_sub_graph[[23]]
-#emove <- V(sub_graph)$type_node == "collection_item"
-#sub_graph_reduced <- delete_vertices(sub_graph, V(sub_graph)[remove])
 V(sub_graph_reduced)$label <- V(sub_graph_reduced)$name_node
 plot(sub_graph_reduced)
 

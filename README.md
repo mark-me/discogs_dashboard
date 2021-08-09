@@ -10,4 +10,4 @@ Rules for likeness
 * An edge between a node with high number of releases and a performer with
 
 Data structure
-* Only add main releases to artists instead of all releases
+* Change data loading for releases and collection items do the key column names match (id_release_main is *not* a master)
