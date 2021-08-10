@@ -37,7 +37,7 @@ if(nrow(df_artists) > 0){
   df_artist_urls    <- extract_artist_urls(df_artists)
   df_artists        <- clean_artist_df(df_artists)    
   df_artists        <- artists_add_image(df_artists, df_artist_images)
-  
+
   # Write artist data to database
   name_table <- "artists"
   has_table <- dbExistsTable(db_discogs, name_table)

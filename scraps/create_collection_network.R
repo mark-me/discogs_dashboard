@@ -23,10 +23,34 @@ keep <- performers_with_release | multiple_edges
 remove <- !keep
 
 graph_reduced <- delete_vertices(graph_all, V(graph_all)[remove])
+graph_reduced <- simplify(graph_reduced)
 
-clust <- cluster_edge_betweenness(graph_reduced, directed = FALSE)
+
+
+# Clustering of network nodes ----
+clust <- cluster_fast_greedy(graph_reduced)
+#clust <- cluster_edge_betweenness(graph_reduced, directed = FALSE)
+#write_rds(clust, "cluster_edge_betweenness.rds")
+
 V(graph_reduced)[names(membership(clust))]$community <- membership(clust)
+table(V(graph_reduced)$community)
 
+length(V(graph_reduced)[V(graph_reduced)$type_node == "performer"])
+V(graph_reduced)$color = ifelse(V(graph_reduced)$type_node == "performer", "orange", "green")
+graph_community <- delete_vertices(graph_reduced, V(graph_reduced)[V(graph_reduced)$community != 7])
+plot(graph_community)
+
+library(RColorBrewer)
+qty_colors <- length(unique(V(graph_reduced)$community))
+mycolors <- colorRampPalette(brewer.pal(8, "Set2"))(qty_colors)
+V(graph_reduced)$label <- V(graph_reduced)$name_node
+V(graph_reduced)$color <- mycolors[V(graph_reduced)$community]
+plot(clust, graph_reduced)
+
+df_community <- tibble(
+  community = V(graph_reduced)$community,
+  name_artist = V(graph_reduced)$name_node
+)
 
 # qty_node_edges <- degree(graph_reduced)
 # table(qty_node_edges)

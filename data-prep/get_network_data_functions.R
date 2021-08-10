@@ -93,16 +93,22 @@ get_artist_nodes <- function(){
   db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
   
   res <- dbSendQuery(db_conn, paste0("SELECT * FROM artists"))
-  df_result <- dbFetch(res)
+  df_artist_result <- dbFetch(res)
   
-  df_result %<>% 
+  res <- dbSendQuery(db_conn, paste0("SELECT id_artist, count(*) as qty_collection_items 
+                                   FROM collection_artists
+                                   GROUP BY id_artist"))
+  df_collection_result <- dbFetch(res)
+  
+  df_artist_result %<>% 
+    left_join(df_collection_result, by = "id_artist") %>% 
     select(id_node = id_artist, name_node = name_artist, everything()) %>% 
     mutate(type_performer = "artist",
            id_node = paste0("p_", id_node))
-
+  
   dbDisconnect(db_conn)
   
-  return(df_result)  
+  return(df_artist_result)  
 }
 
 get_member_nodes <- function(){
