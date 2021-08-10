@@ -8,14 +8,18 @@ load_discogs_artist_releases <- function(db, df_artists){
     df_artists %<>% anti_join(df_previous, by = "id_artist")
   }
   
+  # Gathering artist release JSON replies in a list
   lst_releases <- lst_json <- list()
   for(row in 1:nrow(df_artists)){
     
+    # Get the number of API pages
     lst_json <- api_request_artist_release(id_artist = df_artists[row, "id_artist"], 
                                            idx_page = 1, 
                                            api_discogs_config)
     print(paste(row, "-", df_artists[row, "name_artist"]))
     pb <- txtProgressBar(min = 0, max = lst_json$pagination$pages, style = 3)
+    
+    # Iterate through release pages 
     for(idx_page in 1:lst_json$pagination$pages){
       
       lst_json <- api_request_artist_release(id_artist = df_artists[row, "id_artist"], 
@@ -31,6 +35,7 @@ load_discogs_artist_releases <- function(db, df_artists){
     }
   }  
   
+  # Combine artist release info from the list into a data frame
   df_releases <- bind_rows(lst_releases) %>% 
     rename(id_release = id,
            id_release_main = main_release,
@@ -57,5 +62,9 @@ api_request_artist_release <- function(id_artist, idx_page, api_discogs_config){
       Sys.sleep(65)
     }
   }
+  if(lst_json[[1]] == "Artist not found."){
+    lst_json <- NULL
+  }
   return(lst_json)
 }
+
