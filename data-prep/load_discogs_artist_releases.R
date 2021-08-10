@@ -62,9 +62,6 @@ api_request_artist_release <- function(id_artist, idx_page, api_discogs_config){
       Sys.sleep(65)
     }
   }
-  if(lst_json[[1]] == "Artist not found."){
-    lst_json <- NULL
-  }
   return(lst_json)
 }
 
