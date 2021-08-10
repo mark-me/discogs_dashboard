@@ -32,14 +32,14 @@ load_discogs_artists <- function(db, df_collection_artists){
       lst_json <- fromJSON(json_text)
     }
     
-    # Check
+    # Check if the time limit for API calls was reached
     if(length(lst_json) == 1) {
       print(lst_json[[1]])
       print("Waiting...")
       Sys.sleep(65)
       print("Resuming")
     } else {
-      print("Adding new artist")
+      print("Adding new artist") # If not add net API reply to the list
       lst_data <- list(
         id_artist          = lst_json$id,
         name_artist        = lst_json$name,
@@ -59,6 +59,7 @@ load_discogs_artists <- function(db, df_collection_artists){
     }
   }
   
+  # Combine all artist JSON data to a data frame
   df_artist_information <- as_tibble(do.call("rbind", lst_artists)) %>% 
     filter(id_artist != "NULL")
   
