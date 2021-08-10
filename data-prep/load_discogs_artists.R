@@ -1,13 +1,15 @@
 load_discogs_artists <- function(db, df_collection_artists){
 
-  name_table <- "artists"
+  name_table <- "artists" # SQLite table
   
+  # Getting the artists of the collection
   df_artists <- df_collection_artists %>% 
     select(id_artist,
            name_artist,
            api_artist) %>% 
     unique() 
   
+  # If the artist data is already present in the database no further processing is required
   has_table <- dbExistsTable(db, name_table)
   if(has_table){
    df_previous <- dbReadTable(conn = db, name = name_table)
@@ -15,11 +17,13 @@ load_discogs_artists <- function(db, df_collection_artists){
      anti_join(df_previous, by = "id_artist")
   }
 
+  # Gathering all artist data from the API and putting the replies in a list
   row <- 1
   lst_artists <- list()
   lst_json    <- list()
   while(row <= nrow(df_artists)){
     
+    # Gather the data, only is the field with the API call is filled
     if(df_artists[row, "api_artist"] != "" & !is.na(df_artists[row, "api_artist"])){
       
       json <- GET(paste0(df_artists[row, "api_artist"], 
@@ -28,6 +32,7 @@ load_discogs_artists <- function(db, df_collection_artists){
       lst_json <- fromJSON(json_text)
     }
     
+    # Check
     if(length(lst_json) == 1) {
       print(lst_json[[1]])
       print("Waiting...")
@@ -185,7 +190,7 @@ artists_add_image <- function(df_artists, df_artist_images){
   return(df_artists)
 }
 
-# Function to get all artists, groups, members and alaises in one table
+# Function to get all artists, groups, members and aliases in one table
 get_artists_from_all <- function(){
   
   db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
