@@ -25,13 +25,16 @@ load_discogs_artist_releases <- function(db, df_artists){
       lst_json <- api_request_artist_release(id_artist = df_artists[row, "id_artist"], 
                                              idx_page = idx_page, 
                                              api_discogs_config)     
-      
-      for(i in 1:length(lst_json$releases)){
-        lst_json$releases[[i]]$stats <- NULL
-        lst_json$releases[[i]]$id_artist <- df_artists[row, "id_artist"]
+      # Check whether the artist was found
+      if(is.null(lst_json$message)){
+        # Add found artist information to the list
+        for(i in 1:length(lst_json$releases)){
+          lst_json$releases[[i]]$stats <- NULL
+          lst_json$releases[[i]]$id_artist <- df_artists[row, "id_artist"]
+        }
+        setTxtProgressBar(pb, idx_page)
+        lst_releases <- c(lst_releases, lst_json$releases)
       }
-      setTxtProgressBar(pb, idx_page)
-      lst_releases <- c(lst_releases, lst_json$releases)
     }
   }  
   
