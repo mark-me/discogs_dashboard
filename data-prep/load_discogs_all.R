@@ -9,6 +9,7 @@ config <- read_yaml("config.yml")
 source("data-prep/discogs_helper_functions.R")
 source("data-prep/load_discogs_collection.R")
 source("data-prep/load_discogs_artists.R")
+source("data-prep/load_discogs_artist_releases.R")
 
 df_collection_items   <- load_discogs_collection()
 df_collection_artists <- extract_collection_artists(df_collection_items)
@@ -52,7 +53,7 @@ if(nrow(df_artists) > 0){
 # Load data for new artist releases
 if(config$reload_artist_releases_discogs){
   
-  df_artists         <- dbReadTable(db_discogs, "artists")
+  df_artists         <- get_artists_from_all()
   df_artist_releases <- load_discogs_artist_releases(db, df_artists)
 
   # Write artist data to database

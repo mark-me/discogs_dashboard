@@ -184,3 +184,27 @@ artists_add_image <- function(df_artists, df_artist_images){
   
   return(df_artists)
 }
+
+# Function to get all artists, groups, members and alaises in one table
+get_artists_from_all <- function(){
+  
+  db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
+  
+  res <- dbSendQuery(db_conn, paste0("SELECT id_artist, name_artist FROM artists"))
+  df_artists <- dbFetch(res)
+  
+  res <- dbSendQuery(db_conn, paste0("SELECT id_alias AS id_artist, name_alias AS name_artist FROM artist_aliases"))
+  df_aliases <- dbFetch(res)
+  
+  res <- dbSendQuery(db_conn, paste0("SELECT id_group AS id_artist, name_group AS name_artist FROM artist_groups"))
+  df_groups <- dbFetch(res)
+  
+  res <- dbSendQuery(db_conn, paste0("SELECT id_member AS id_artist, name_member AS name_artist FROM artist_members"))
+  df_members <- dbFetch(res)
+  
+  df_artists_all <- bind_rows(df_artists,
+                              df_aliases,
+                              df_groups,
+                              df_members) %>% unique()
+  return(df_artists_all)
+}
