@@ -4,11 +4,12 @@ library(tidyverse)
 library(magrittr)
 library(yaml)
 library(RSQLite)
+library(igraph)
 
 config <- read_yaml("config.yml")
-source("data-prep/get_data_functions.R")
+source("data-prep/get_network_data_functions.R")
 
-lst_network <- get_collection_network()
+lst_network <- get_release_network()
 
 graph_all <- graph_from_data_frame(lst_network$df_edges, 
                                    vertices = lst_network$df_nodes, 
@@ -16,13 +17,40 @@ graph_all <- graph_from_data_frame(lst_network$df_edges,
 
 # Removing irrelevant nodes from the network
 performers_with_release <- V(graph_all)$qty_releases > 0
-collection_items <- V(graph_all)$type_node == "collection_item"
 qty_node_edges <- degree(graph_all)
 multiple_edges <- V(graph_all)$name %in% names(qty_node_edges[qty_node_edges > 1])
-keep <- performers_with_release | collection_items | multiple_edges
+keep <- performers_with_release | multiple_edges
 remove <- !keep
 
 graph_reduced <- delete_vertices(graph_all, V(graph_all)[remove])
+graph_reduced <- simplify(graph_reduced)
+
+
+
+# Clustering of network nodes ----
+clust <- cluster_fast_greedy(graph_reduced)
+#clust <- cluster_edge_betweenness(graph_reduced, directed = FALSE)
+#write_rds(clust, "cluster_edge_betweenness.rds")
+
+V(graph_reduced)[names(membership(clust))]$community <- membership(clust)
+table(V(graph_reduced)$community)
+
+length(V(graph_reduced)[V(graph_reduced)$type_node == "performer"])
+V(graph_reduced)$color = ifelse(V(graph_reduced)$type_node == "performer", "orange", "green")
+graph_community <- delete_vertices(graph_reduced, V(graph_reduced)[V(graph_reduced)$community != 7])
+plot(graph_community)
+
+library(RColorBrewer)
+qty_colors <- length(unique(V(graph_reduced)$community))
+mycolors <- colorRampPalette(brewer.pal(8, "Set2"))(qty_colors)
+V(graph_reduced)$label <- V(graph_reduced)$name_node
+V(graph_reduced)$color <- mycolors[V(graph_reduced)$community]
+plot(clust, graph_reduced)
+
+df_community <- tibble(
+  community = V(graph_reduced)$community,
+  name_artist = V(graph_reduced)$name_node
+)
 
 # qty_node_edges <- degree(graph_reduced)
 # table(qty_node_edges)
@@ -31,11 +59,9 @@ graph_reduced <- delete_vertices(graph_all, V(graph_all)[remove])
 
 # Get sub-graphs of interconnected nodes
 lst_sub_graph <- decompose(graph_reduced)
-qty_nodes_sub_graph <- lengths(lapply(lst_sub_graph, '[[') )
+qty_nodes_sub_graph <- lengths(lapply(lst_sub_graph, '[['))
+sub_graph_reduced <- lst_sub_graph[[30]]
 
-sub_graph_reduced <- lst_sub_graph[[23]]
-#emove <- V(sub_graph)$type_node == "collection_item"
-#sub_graph_reduced <- delete_vertices(sub_graph, V(sub_graph)[remove])
 V(sub_graph_reduced)$label <- V(sub_graph_reduced)$name_node
 plot(sub_graph_reduced)
 
