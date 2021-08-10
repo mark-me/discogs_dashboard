@@ -5,14 +5,14 @@ Creating a buyer dashboard based on their [Discogs](https://www.discogs.com) col
 # Storing credentials
 
 I've used the _.Renviron_ file to store my Discogs token and user name so those aren't in my public code. The steps to set these yourself:
-'''
+```
 usethis::edit_r_environ()
-'''
+```
 Add the lines
-'''
+```
 DISCOGS_TOKEN=<your-token>
 DISCOGS_USER=<your-user-name>
-'''
+```
 And restart the R session.
 
 # Me just plowing through
