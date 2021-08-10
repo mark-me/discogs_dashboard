@@ -1,10 +1,15 @@
-load_discogs_artist_releases <- function(db, df_artists){
+load_discogs_artist_releases <- function(df_artists){
   
   name_table <- "artist_releases"
   
+  # Skipping artists that already have release information in the database
   has_table <- dbExistsTable(db, name_table)
   if(has_table){
-    df_previous <- dbReadTable(conn = db, name = name_table)
+
+        db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
+    res <- dbSendQuery(db_conn, paste0("SELECT id_artist FROM artist_releases"))
+    df_previous <- dbFetch(res)
+    
     df_artists %<>% anti_join(df_previous, by = "id_artist")
   }
   
@@ -16,7 +21,7 @@ load_discogs_artist_releases <- function(db, df_artists){
     lst_json <- api_request_artist_release(id_artist = df_artists[row, "id_artist"], 
                                            idx_page = 1, 
                                            api_discogs_config)
-    print(paste(row, "-", df_artists[row, "name_artist"]))
+    print(paste(row, "-", df_artists[row, "name_artist"])) # Progress indicator stuff
     pb <- txtProgressBar(min = 0, max = lst_json$pagination$pages, style = 3)
     
     # Iterate through release pages 
