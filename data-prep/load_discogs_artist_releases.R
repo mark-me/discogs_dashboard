@@ -2,14 +2,9 @@ load_discogs_artist_releases <- function(df_artists){
   
   name_table <- "artist_releases"
   
-  # Skipping artists that already have release information in the database
   has_table <- dbExistsTable(db, name_table)
   if(has_table){
-
-    db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
-    res <- dbSendQuery(db_conn, paste0("SELECT id_artist FROM artist_releases"))
-    df_previous <- dbFetch(res)
-    
+    df_previous <- dbReadTable(conn = db, name = name_table)
     df_artists %<>% anti_join(df_previous, by = "id_artist")
   }
   
@@ -21,17 +16,20 @@ load_discogs_artist_releases <- function(df_artists){
     lst_json <- api_request_artist_release(id_artist = df_artists[row, "id_artist"], 
                                            idx_page = 1, 
                                            api_discogs_config)
-    print(paste(row, "-", df_artists[row, "name_artist"])) # Progress indicator stuff
-    pb <- txtProgressBar(min = 0, max = lst_json$pagination$pages, style = 3)
-    
-    # Iterate through release pages 
-    for(idx_page in 1:lst_json$pagination$pages){
+    print(paste(row, "-", df_artists[row, "name_artist"]))
+
+    # Make sure the artist is found on Discogs
+    if(is.null(lst_json$message)){  
+      pb <- txtProgressBar(min = 0, max = lst_json$pagination$pages, style = 3)
       
-      lst_json <- api_request_artist_release(id_artist = df_artists[row, "id_artist"], 
-                                             idx_page = idx_page, 
-                                             api_discogs_config)     
-      # Check whether the artist was found
-      if(is.null(lst_json$message)){
+      # Iterate through release pages 
+      for(idx_page in 1:lst_json$pagination$pages){
+        
+        lst_json <- api_request_artist_release(id_artist = df_artists[row, "id_artist"], 
+                                               idx_page = idx_page, 
+                                               api_discogs_config)     
+        # Check whether the artist was found
+        
         # Add found artist information to the list
         for(i in 1:length(lst_json$releases)){
           lst_json$releases[[i]]$stats <- NULL
@@ -52,6 +50,7 @@ load_discogs_artist_releases <- function(df_artists){
     mutate(id_release = as.character(id_release),
            id_release_main = as.character(id_release_main)) %>% 
     unique()
+  
   return(df_releases)
 }
 
