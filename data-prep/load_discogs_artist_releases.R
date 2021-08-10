@@ -6,7 +6,7 @@ load_discogs_artist_releases <- function(df_artists){
   has_table <- dbExistsTable(db, name_table)
   if(has_table){
 
-        db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
+    db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
     res <- dbSendQuery(db_conn, paste0("SELECT id_artist FROM artist_releases"))
     df_previous <- dbFetch(res)
     
@@ -57,6 +57,7 @@ load_discogs_artist_releases <- function(df_artists){
 
 api_request_artist_release <- function(id_artist, idx_page, api_discogs_config){
  
+  # Checking if there were too many discogs API requests
   lst_json[[1]] <- "You are making requests too quickly."
   while (lst_json[[1]] == "You are making requests too quickly.") {
     
@@ -66,6 +67,8 @@ api_request_artist_release <- function(id_artist, idx_page, api_discogs_config){
                        "&token=", api_discogs_config$token))
     json_text <- content(json, as = "text", encoding = "UTF-8")
     lst_json <- fromJSON(json_text)
+    
+    # Give Discogs API some breathing space
     if(lst_json[[1]] == "You are making requests too quickly."){
       Sys.sleep(65)
     }
