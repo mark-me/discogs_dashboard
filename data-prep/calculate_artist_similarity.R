@@ -7,8 +7,13 @@ library(RSQLite)
 library(igraph)
 source("data-prep/load_discogs_all.R")
 
-# Calculate shortest distances between releases ----
-calculate_artist_similarity <- function(recalculate = FALSE){
+# Calculate release similarity for sorting releases ----
+calculate_release_similarity <- function(recalculate = FALSE){
+  
+}
+
+# Calculate shortest distances between performers ----
+calculate_performer_similarity <- function(recalculate = FALSE){
 
   graph_releases <- get_graph_releases()
 
