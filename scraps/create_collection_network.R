@@ -21,25 +21,34 @@ qty_node_edges <- degree(graph_all)
 multiple_edges <- V(graph_all)$name %in% names(qty_node_edges[qty_node_edges > 1])
 keep <- performers_with_release | multiple_edges
 remove <- !keep
-
 graph_reduced <- delete_vertices(graph_all, V(graph_all)[remove])
+# Remove mutual affirming edges
 graph_reduced <- simplify(graph_reduced)
 
 
 
-# Clustering of network nodes ----
+# Clustering of network nodes to find communities within the graph ----
 clust <- cluster_fast_greedy(graph_reduced)
 #clust <- cluster_edge_betweenness(graph_reduced, directed = FALSE)
 #write_rds(clust, "cluster_edge_betweenness.rds")
 
+# Assigning the results of the clustering back to the network nodes
 V(graph_reduced)[names(membership(clust))]$community <- membership(clust)
-table(V(graph_reduced)$community)
 
-length(V(graph_reduced)[V(graph_reduced)$type_node == "performer"])
-V(graph_reduced)$color = ifelse(V(graph_reduced)$type_node == "performer", "orange", "green")
-graph_community <- delete_vertices(graph_reduced, V(graph_reduced)[V(graph_reduced)$community != 7])
+# Checks: number of nodes in the network, and only those that represent artists
+table(V(graph_reduced)$community)
+table(V(graph_reduced)[V(graph_reduced)$type_node == "performer"]$community)
+
+# Select a community and plot it
+idx_community <- 1
+graph_community <- delete_vertices(graph_reduced, V(graph_reduced)[V(graph_reduced)$community != idx_community])
+bool_performers <- V(graph_community)$type_node == "performer"
+V(graph_community)[!bool_performers]$label <- ""
+graph_community <- delete_vertices(graph_community, V(graph_community)[!bool_performers])
+
 plot(graph_community)
 
+# Doing some stuff I'll keep around, but not sure what it does yet
 library(RColorBrewer)
 qty_colors <- length(unique(V(graph_reduced)$community))
 mycolors <- colorRampPalette(brewer.pal(8, "Set2"))(qty_colors)
@@ -60,9 +69,11 @@ df_community <- tibble(
 # Get sub-graphs of interconnected nodes
 lst_sub_graph <- decompose(graph_reduced)
 qty_nodes_sub_graph <- lengths(lapply(lst_sub_graph, '[['))
-sub_graph_reduced <- lst_sub_graph[[30]]
+sub_graph_reduced <- lst_sub_graph[[4]]
 
-V(sub_graph_reduced)$label <- V(sub_graph_reduced)$name_node
+idx_performers <- V(sub_graph_reduced)$type_node == "performer"
+V(sub_graph_reduced)[idx_performers]$label <- V(sub_graph_reduced)[idx_performers]$name_node
+
 plot(sub_graph_reduced)
 
 between_sub_graph <- betweenness(sub_graph_reduced)
