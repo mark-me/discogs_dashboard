@@ -9,23 +9,59 @@ library(igraph)
 config <- read_yaml("config.yml")
 source("data-prep/get_network_data_functions.R")
 
-lst_network <- get_release_network()
+graph_releases <- get_graph_releases()
 
-graph_all <- graph_from_data_frame(lst_network$df_edges, 
-                                   vertices = lst_network$df_nodes, 
-                                   directed = FALSE)
+# What are the vertex attributes again?
+list.vertex.attributes(graph_releases)
 
-# Removing irrelevant nodes from the network
-performers_with_release <- V(graph_all)$qty_releases > 0
-qty_node_edges <- degree(graph_all)
-multiple_edges <- V(graph_all)$name %in% names(qty_node_edges[qty_node_edges > 1])
-keep <- performers_with_release | multiple_edges
-remove <- !keep
-graph_reduced <- delete_vertices(graph_all, V(graph_all)[remove])
-# Remove mutual affirming edges
-graph_reduced <- simplify(graph_reduced)
+# Calculate the representative artists
+qty_node_edges <- degree(graph_releases)
+V(graph_releases)$qty_edges <- qty_node_edges
+
+# See the most authoritative performers
+hase_a_lot_of_edges <- V(graph_releases)$qty_edges > 300
+V(graph_releases)[hase_a_lot_of_edges]$name_node
+
+# Removing non-connecting releases
+release_single_performer <- !is.na(V(graph_releases)$type_release) & V(graph_releases)$qty_edges == 1
+graph_connecting <- delete_vertices(graph_releases, V(graph_releases)[release_single_performer])
+
+# Create communities and review the most authoritative performers of each community
+clust_releases <- cluster_fast_greedy(graph_releases)
+#clust <- cluster_edge_betweenness(graph_releases, weights = NULL, directed = FALSE)
+write_rds(clust, "cluster_edge_betweenness.rds")
+V(graph_releases)[clust_releases$names]$cluster <- clust_releases$membership
+
+# Should I remove the releases now?
+
+# Find most authoritative performers of each community
+qty_authoritative <- 3
+
+df_authoritative <- tibble(
+  cluster = V(graph_releases)$cluster,
+  type_performer = V(graph_releases)$type_performer,
+  name_artist = V(graph_releases)$name_node,
+  id_performer = V(graph_releases)$name,
+  qty_collection_items = V(graph_releases)$qty_collection_items,
+  qty_edges = V(graph_releases)$qty_edges 
+)
+
+df_authoritative %<>%
+  arrange(desc(qty_edges)) %>% 
+  group_by(cluster) %>% 
+  mutate(idx_row_qty_edges = row_number()) %>% 
+  ungroup()
+
+df_test <- df_authoritative %>% 
+  filter(!is.na(type_performer)) %>% 
+  filter(!is.infinite(qty_collection_items)) %>% 
+  filter(idx_row_qty_edges <= qty_authoritative) %>% 
+  arrange(cluster)
+
+table(V(graph_releases)$type_performer, useNA = "ifany")
 
 
+# Declared to be old, but still useful (2021-08-12)
 
 # Clustering of network nodes to find communities within the graph ----
 clust <- cluster_fast_greedy(graph_reduced)
@@ -43,10 +79,14 @@ table(V(graph_reduced)[V(graph_reduced)$type_node == "performer"]$community)
 idx_community <- 1
 graph_community <- delete_vertices(graph_reduced, V(graph_reduced)[V(graph_reduced)$community != idx_community])
 bool_performers <- V(graph_community)$type_node == "performer"
-V(graph_community)[!bool_performers]$label <- ""
-graph_community <- delete_vertices(graph_community, V(graph_community)[!bool_performers])
+graph_performer_community <- delete_vertices(graph_community, V(graph_community)[!bool_performers])
 
-plot(graph_community)
+plot(graph_performer_community)
+
+bool_releases <- V(graph_community)$type_node != "performer"
+graph_releases_community <- delete_vertices(graph_community, V(graph_community)[!bool_releases])
+plot(graph_releases_community)
+
 
 # Doing some stuff I'll keep around, but not sure what it does yet
 library(RColorBrewer)
