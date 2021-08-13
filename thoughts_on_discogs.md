@@ -20,4 +20,4 @@ I want to suggest of sorting for the records which is based on artist collaborat
 
 Artist will sort according to related releases. The relative more collection items there are in a 'block' (subgraph), the more 'representative' artists are shown. If the user selects a representative performer, the community of which the performer is part of is displayed. The corresponding releases will be shown (filtering on in collection or not)
 
-Is representative authorative? Artists having been involved of the most releases, not matter the role are the most representative.
+Is representative authorative? Artists having been involved of the most releases, not matter the role are the most representative. Number of edges
