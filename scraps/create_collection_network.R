@@ -27,11 +27,14 @@ release_single_performer <- !is.na(V(graph_releases)$type_release) & V(graph_rel
 graph_connecting <- delete_vertices(graph_releases, V(graph_releases)[release_single_performer])
 
 # Create communities and review the most authoritative performers of each community
-clust_releases <- cluster_fast_greedy(graph_releases)
+#clust_releases <- cluster_fast_greedy(graph_releases)
 #clust <- cluster_edge_betweenness(graph_releases, weights = NULL, directed = FALSE)
-write_rds(clust, "cluster_edge_betweenness.rds")
+#write_rds(clust, "cluster_edge_betweenness.rds")
+clust_releases <- read_rds("cluster_edge_betweenness.rds")
+dendo_clusters <- as.dendrogram(clust_releases)
+clust_releases <- clust
 V(graph_releases)[clust_releases$names]$cluster <- clust_releases$membership
-
+table(clust_releases$membership)
 # Should I remove the releases now?
 
 # Find most authoritative performers of each community
