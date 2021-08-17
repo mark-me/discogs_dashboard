@@ -204,7 +204,7 @@ get_master_nodes <- function(){
               url_thumbnail = first(image_thumbnail, order_by = year)) %>% 
     ungroup() %>% 
     mutate(type_release = "release",
-           id_node = paste0("r_", id_node))  
+           id_node = paste0("r_", id_node))
   dbDisconnect(db_conn)
   
   return(df_result)  
@@ -293,7 +293,13 @@ get_master_edges <- function(){
   
   df_result %<>% 
     filter(role %in% c("Main", "Producer", "Co-producer", "Mixed by", "Remix")) %>% 
-    select(from = id_artist,  to = id_release) %>% 
+    mutate(performer_role = recode(role,
+                                   `Main` = "main", 
+                                   `Producer` = "producer", 
+                                   `Co-producer`= "co_producer",
+                                   `Mixed by` = "mixed_by",
+                                   `Remix` = "remix")) %>% 
+    select(from = id_artist,  to = id_release, performer_role) %>% 
     mutate(type_edge = "release",
            from = paste0("p_", from),
            to = paste0("r_", to))
