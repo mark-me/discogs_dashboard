@@ -8,6 +8,7 @@ library(igraph)
 
 config <- read_yaml("config.yml")
 source("data-prep/get_network_data_functions.R")
+source("data-prep/calculate_artist_similarity.R")
 
 graph_releases <- get_graph_releases()
 
@@ -32,7 +33,7 @@ graph_connecting <- delete_vertices(graph_releases, V(graph_releases)[release_si
 #write_rds(clust, "cluster_edge_betweenness.rds")
 clust_releases <- read_rds("cluster_edge_betweenness.rds")
 dendo_clusters <- as.dendrogram(clust_releases)
-clust_releases <- clust
+hclust_clusters <- as.hclust(clust_releases)
 V(graph_releases)[clust_releases$names]$cluster <- clust_releases$membership
 table(clust_releases$membership)
 # Should I remove the releases now?
@@ -57,11 +58,10 @@ df_authoritative %<>%
 
 df_test <- df_authoritative %>% 
   filter(!is.na(type_performer)) %>% 
-  filter(!is.infinite(qty_collection_items)) %>% 
+  #filter(!is.infinite(qty_collection_items)) %>% 
   filter(idx_row_qty_edges <= qty_authoritative) %>% 
   arrange(cluster)
 
-table(V(graph_releases)$type_performer, useNA = "ifany")
 
 
 # Declared to be old, but still useful (2021-08-12)
