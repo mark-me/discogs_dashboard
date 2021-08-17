@@ -5,7 +5,7 @@ library(magrittr)
 library(yaml)
 library(RSQLite)
 library(igraph)
-source("data-prep/load_discogs_all.R")
+#source("data-prep/load_discogs_all.R")
 
 # Calculate release similarity for sorting releases ----
 calculate_release_similarity <- function(recalculate = FALSE){
