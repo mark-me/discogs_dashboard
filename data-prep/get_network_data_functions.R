@@ -73,6 +73,32 @@ get_performer_network <- function(){
     ungroup() %>% 
     mutate(type_node = "performer")
   
+  # Add performer roles
+  db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
+  
+  res <- dbSendQuery(db_conn, paste0("SELECT id_artist, role, COUNT(*) as qty_roles 
+                                      FROM artist_releases
+                                      GROUP BY id_artist, role"))
+  df_performer_roles <- dbFetch(res)
+  
+  df_performer_roles %<>% 
+    filter(role %in% c("Main", "Producer", "Co-producer", "Mixed by", "Remix")) %>% 
+    mutate(role = recode(role,
+                         `Main` = "qty_main_performer", 
+                         `Producer` = "qty_producer", 
+                         `Co-producer`= "qty_co_producer",
+                         `Mixed by` = "qty_mixer",
+                         `Remix` = "qty_remixer")) %>%
+    pivot_wider(id_cols = "id_artist",
+                names_from = role,
+                values_from = qty_roles,
+                values_fn = sum,
+                values_fill = 0) %>% 
+    mutate(id_artist = paste0("p_", id_artist))
+  
+  df_nodes %<>%
+    left_join(df_performer_roles, by = c("id_node" = "id_artist"))
+  
   df_edges <- bind_rows(
     get_membership_edges(),
     get_group_edges(),
