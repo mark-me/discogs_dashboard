@@ -50,6 +50,7 @@ get_collection_network <- function(){
     summarise(qty_releases = sum(is_release, na.rm = TRUE)) %>% 
     ungroup()
   
+  # Combine into network list data frames
   lst_network <- list(
     df_nodes = df_nodes,
     df_edges = df_edges
@@ -82,7 +83,20 @@ get_performer_network <- function(){
   df_performer_roles <- dbFetch(res)
   
   df_performer_roles %<>% 
-    filter(role %in% c("Main", "Producer", "Co-producer", "Mixed by", "Remix")) %>% 
+    filter(role %in% c("Main", "Producer", "Co-producer", "Mixed by", "Remix"))  
+
+  # Finding the main role of the performer
+  df_main_role <- df_performer_roles %>% 
+    group_by(id_artist) %>% 
+    mutate(qty_role_max = max(qty_roles)) %>% 
+    ungroup() %>% 
+    filter(qty_roles == qty_role_max) %>% 
+    mutate(role = ordered(role, levels = c("Main", "Producer", "Co-producer", "Mixed by", "Remix"))) %>% 
+    group_by(id_artist) %>% 
+    summarise(role_primary = first(role, order_by = role)) %>% 
+    ungroup()
+    
+  df_performer_roles %<>%   
     mutate(role = recode(role,
                          `Main` = "qty_main_performer", 
                          `Producer` = "qty_producer", 
@@ -94,17 +108,20 @@ get_performer_network <- function(){
                 values_from = qty_roles,
                 values_fn = sum,
                 values_fill = 0) %>% 
+    left_join(df_main_role, by = "id_artist") %>% 
     mutate(id_artist = paste0("p_", id_artist))
   
   df_nodes %<>%
     left_join(df_performer_roles, by = c("id_node" = "id_artist"))
   
+  # Collect edges
   df_edges <- bind_rows(
     get_membership_edges(),
     get_group_edges(),
     get_alias_edges()
   ) %>% unique()
   
+  # Combine into network list data frames
   lst_network <- list(
     df_nodes = df_nodes,
     df_edges = df_edges
