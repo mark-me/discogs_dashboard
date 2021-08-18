@@ -5,6 +5,8 @@ library(magrittr)
 library(yaml)
 library(RSQLite)
 library(igraph)
+library(dendextend)
+library(ape)
 
 config <- read_yaml("config.yml")
 source("data-prep/get_network_data_functions.R")
@@ -32,8 +34,6 @@ graph_connecting <- delete_vertices(graph_releases, V(graph_releases)[release_si
 #clust <- cluster_edge_betweenness(graph_releases, weights = NULL, directed = FALSE)
 #write_rds(clust, "cluster_edge_betweenness.rds")
 clust_releases <- read_rds("cluster_edge_betweenness.rds")
-dendo_clusters <- as.dendrogram(clust_releases)
-hclust_clusters <- as.hclust(clust_releases)
 V(graph_releases)[clust_releases$names]$cluster <- clust_releases$membership
 table(clust_releases$membership)
 # Should I remove the releases now?
@@ -59,11 +59,66 @@ df_authoritative %<>%
 
 df_test <- df_authoritative %>% 
   filter(!is.na(type_performer)) %>% 
+  filter(qty_collection_items > 0 ) %>% 
   #filter(!is.infinite(qty_collection_items)) %>% 
-  filter(idx_row_qty_edges <= qty_authoritative) %>% 
+  #filter(idx_row_qty_edges <= qty_authoritative) %>% 
   arrange(cluster)
 
+# Get different cutpoints
+dendro_clusters <- as.dendrogram(clust_releases)
 
+# Find the minimum of communities
+res_cut <- cut_at(clust_releases, no = 1)
+qty_communities_min <- max(res_cut)
+
+# Getting all community memberships from top to bottom of the hierarchy
+qty_communities <- qty_communities_min
+idx_step <- 1
+lst_communities <- list()
+while(qty_communities < length(clust_releases$membership)){
+  
+  no_communities <- qty_communities_min + idx_step
+  id_communities <- cut_at(clust_releases, no = no_communities)
+  qty_communities <- max(id_communities)
+  
+  lst_communities[[idx_step]] <- tibble(
+    id_node = V(graph_releases)$name,
+    idx_step = rep(idx_step, length(id_communities)),
+    id_community = id_communities
+  )
+  idx_step <- idx_step + 1
+}
+df_communities <- bind_rows(lst_communities)
+
+
+dendro_clusters %>% nnodes
+
+
+
+
+hclust_clusters <- as.hclust(clust_releases)
+
+
+phylo_clusters <- as_phylo(clust_releases)
+phylo_clusters$edge
+plot(phylo_clusters, type = "fan")
+
+res_cut <- cut_at(clust_releases, no = 1)
+qty_communities_min <- max(res_cut)
+table(res_cut)
+
+qty_communities_step <- qty_communities_min + 5
+res_cut <- cut_at(clust_releases, no = qty_communities_step)
+table(res_cut)
+
+qty_communities_step <- qty_communities_step + 5
+res_cut <- cut_at(clust_releases, no = qty_communities_step)
+table(res_cut)
+
+
+qty_communities_step <- length(res_cut)
+res_cut <- cut_at(clust_releases, no = qty_communities_step)
+table(res_cut)
 
 # Declared to be old, but still useful (2021-08-12)
 
