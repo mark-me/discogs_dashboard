@@ -70,7 +70,7 @@ get_performer_network <- function(){
   
   df_nodes %<>%
     group_by(id_node, name_node) %>% 
-    summarise(across(name_artist_real:url_thumbnail, ~ min(!is.na(.x), na.rm= TRUE)),
+    summarise(across(name_artist_real:url_thumbnail, ~ first(.x, order_by = .x)),
               qty_collection_items = sum(qty_collection_items, na.rm = TRUE),
               type_performer = min(type_performer, na.rm = TRUE),
               is_active = max(is_active, na.rm = TRUE)) %>% 
