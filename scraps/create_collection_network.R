@@ -44,7 +44,8 @@ qty_authoritative <- 3
 df_authoritative <- tibble(
   cluster = V(graph_releases)$cluster,
   type_performer = V(graph_releases)$type_performer,
-  name_artist = V(graph_releases)$name_node,
+  name_performer = V(graph_releases)$name_node,
+  role_primary = V(graph_releases)$role_primary,
   id_performer = V(graph_releases)$name,
   qty_collection_items = V(graph_releases)$qty_collection_items,
   qty_edges = V(graph_releases)$qty_edges 
