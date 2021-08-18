@@ -70,7 +70,10 @@ get_performer_network <- function(){
   
   df_nodes %<>%
     group_by(id_node, name_node) %>% 
-    summarise(across(name_artist_real:is_active, ~ min(.x, na.rm= TRUE))) %>% 
+    summarise(across(name_artist_real:url_thumbnail, ~ min(!is.na(.x), na.rm= TRUE)),
+              qty_collection_items = sum(qty_collection_items, na.rm = TRUE),
+              type_performer = min(type_performer, na.rm = TRUE),
+              is_active = max(is_active, na.rm = TRUE)) %>% 
     ungroup() %>% 
     mutate(type_node = "performer")
   
@@ -94,7 +97,8 @@ get_performer_network <- function(){
     mutate(role = ordered(role, levels = c("Main", "Producer", "Co-producer", "Mixed by", "Remix"))) %>% 
     group_by(id_artist) %>% 
     summarise(role_primary = first(role, order_by = role)) %>% 
-    ungroup()
+    ungroup() %>% 
+    mutate(role_primary = as.character(role_primary))
     
   df_performer_roles %<>%   
     mutate(role = recode(role,
