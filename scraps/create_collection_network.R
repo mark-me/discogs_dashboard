@@ -93,6 +93,11 @@ while(qty_communities < length(clust_releases$membership)){
   
   idx_step <- idx_step + 1
 }
+db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
+
+res <- dbSendQuery(db_conn, paste0("SELECT * FROM node_community_hierarchy"))
+df_result <- dbFetch(res)
+
 
 
 dendro_clusters <- as.dendrogram(clust_releases)

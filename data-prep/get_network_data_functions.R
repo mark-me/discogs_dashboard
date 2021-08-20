@@ -1,3 +1,57 @@
+# Network clustering ----
+get_artist_clusters <- function(do_cluster_calculation) {
+  # Get a graph with all artists and releases
+  graph_releases <- get_graph_releases()
+  
+  # Removing non-connecting releases
+  release_single_performer <- !is.na(V(graph_releases)$type_release) & V(graph_releases)$qty_edges == 1
+  graph_connecting <- delete_vertices(graph_releases, V(graph_releases)[release_single_performer])
+  
+  if(do_cluster_calculation){
+    
+    clust <- cluster_edge_betweenness(graph_releases, weights = NULL, directed = FALSE)
+    write_rds(clust, "cluster_edge_betweenness.rds")
+    
+    # Get all cluster hierarchies ----
+    name_table <- "node_community_hierarchy"
+    db_discogs <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
+    
+    # Find the minimum of communities
+    res_cut <- cut_at(clust_releases, no = 1)
+    qty_communities_min <- max(res_cut)
+    
+    # Getting all community memberships from top to bottom of the hierarchy
+    qty_communities <- qty_communities_min
+    idx_step <- 1
+    lst_communities <- list()
+    while(qty_communities < length(clust_releases$membership)){
+      
+      no_communities <- qty_communities_min + idx_step
+      id_communities <- cut_at(clust_releases, no = no_communities)
+      qty_communities <- max(id_communities)
+      
+      df_communitiy_membership <- tibble(
+        id_node = V(graph_releases)$name,
+        idx_step = rep(idx_step, length(id_communities)),
+        id_community = id_communities
+      )
+      
+      has_table <- dbExistsTable(db_discogs, name_table)
+      dbWriteTable(db_discogs, name_table, df_communitiy_membership, overwrite = !has_table, append = has_table)
+      
+      idx_step <- idx_step + 1
+    }
+    
+  } else {
+    clust_releases <- read_rds("cluster_edge_betweenness.rds")
+  }
+  
+  # Assign cluster membership to nodes
+  V(graph_releases)[clust_releases$names]$cluster <- clust_releases$membership
+  
+  return(graph_releases)
+}
+
 # Networks ----
 get_release_network <- function(){
 
