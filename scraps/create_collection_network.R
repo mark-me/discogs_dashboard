@@ -64,8 +64,9 @@ df_test <- df_authoritative %>%
   #filter(idx_row_qty_edges <= qty_authoritative) %>% 
   arrange(cluster)
 
-# Get different cutpoints
-dendro_clusters <- as.dendrogram(clust_releases)
+# Get all cluster hierarchies ----
+name_table <- "node_community_hierarchy"
+db_discogs <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
 
 # Find the minimum of communities
 res_cut <- cut_at(clust_releases, no = 1)
@@ -81,23 +82,23 @@ while(qty_communities < length(clust_releases$membership)){
   id_communities <- cut_at(clust_releases, no = no_communities)
   qty_communities <- max(id_communities)
   
-  lst_communities[[idx_step]] <- tibble(
+  df_communitiy_membership <- tibble(
     id_node = V(graph_releases)$name,
     idx_step = rep(idx_step, length(id_communities)),
     id_community = id_communities
   )
+  
+  has_table <- dbExistsTable(db_discogs, name_table)
+  dbWriteTable(db_discogs, name_table, df_communitiy_membership, overwrite = !has_table, append = has_table)
+  
   idx_step <- idx_step + 1
 }
-df_communities <- bind_rows(lst_communities)
 
 
+dendro_clusters <- as.dendrogram(clust_releases)
 dendro_clusters %>% nnodes
 
-
-
-
 hclust_clusters <- as.hclust(clust_releases)
-
 
 phylo_clusters <- as_phylo(clust_releases)
 phylo_clusters$edge
