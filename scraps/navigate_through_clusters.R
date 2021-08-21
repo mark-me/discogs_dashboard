@@ -5,6 +5,7 @@ library(magrittr)
 library(yaml)
 library(RSQLite)
 library(igraph)
+library(visNetwork)
 
 source("data-prep/get_network_data_functions.R")
 source("data-prep/calculate_artist_similarity.R")
@@ -13,60 +14,9 @@ config <- read_yaml("config.yml")
 graph_releases <- get_artist_clusters(FALSE)
 clust_releases <- read_rds("cluster_edge_betweenness.rds")
 
-# Cut community structure making use of the hierarchy of the clustering method
-graph_clusters <- graph_releases
-
-no_communities <- 25
-
-qty_node_edges <- degree(graph_clusters)
-V(graph_clusters)$qty_edges <- qty_node_edges
-
-
-# Modify the attributes so they will be seen correctly at the aggregated level
-df_agg_node_attr <- aggregate_node_attributes(graph_clusters, qty_authoritative = 3)
-
-V(graph_clusters)[df_agg_node_attr$name]$name_performer <- df_agg_node_attr$name_performer_clust
-V(graph_clusters)[df_agg_node_attr$name]$qty_nodes      <- df_agg_node_attr$qty_nodes_clust
-V(graph_clusters)[df_agg_node_attr$name]$qty_collection <- df_agg_node_attr$qty_collection_clust
-V(graph_clusters)[df_agg_node_attr$name]$qty_releases   <- df_agg_node_attr$qty_releases_lcust
-
-graph_contracted <- contract(graph_clusters, V(graph_clusters)$cluster,
-                             vertex.attr.comb = list("first"))
-graph_contracted <- simplify(graph_contracted)
-vertex_attr_names(graph_contracted)
-length(V(graph_contracted))
-length(E(graph_contracted))
-
-V(graph_contracted)$label <- paste0(V(graph_contracted)$name, " - ", V(graph_contracted)$qty_nodes)
-plot(graph_contracted)
-
-# Make a subcluster of the chosen cluster one level lower than previous
-graph_selected <- get_cluster(graph_releases, clust_releases)
-V(graph_selected)$label <- paste0(V(graph_selected)$name, " - ", V(graph_selected)$qty_nodes)
-plot(graph_selected)
-V(graph_selected)$label <- V(graph_selected)$name_performer
-plot(graph_selected)
-
-name_node_selected <- "p_1003228"
-V(graph_releases)[name_node_selected]$name_node
-graph_selected <- get_cluster(graph_releases, clust_releases, name_node_selected = name_node_selected)
-V(graph_selected)$label <- paste0(V(graph_selected)$name, " - ", V(graph_selected)$qty_nodes)
-plot(graph_selected)
-V(graph_selected)$label <- V(graph_selected)$name_performer
-plot(graph_selected)
-
-name_node_selected <- "p_2184902"
-V(graph_releases)[name_node_selected]$name_node
-graph_selected <- get_cluster(graph_releases, clust_releases, name_node_selected = name_node_selected)
-V(graph_selected)$label <- paste0(V(graph_selected)$name, " - ", V(graph_selected)$qty_nodes)
-plot(graph_selected)
-V(graph_selected)$label <- V(graph_selected)$name_performer
-plot(graph_selected)
-
-
 get_cluster <- function(graph_releases, clust_releases, name_node_selected = NA){
   
-  # Cluster until the number of clusters in the subgraph
+  # Cluster until the number of clusters in the sub graph
   qty_clusters_min <- 6
   qty_clusters <- 0
   no_communities <- qty_clusters_min
@@ -77,7 +27,6 @@ get_cluster <- function(graph_releases, clust_releases, name_node_selected = NA)
     V(graph_releases)$cluster <- id_communities
     
     if(!is.na(name_node_selected)){
-      
       graph_clusters <- make_ego_graph(graph_releases, 
                                        order = length(V(graph_releases)),
                                        nodes = V(graph_releases)[name_node_selected])[[1]]
@@ -102,16 +51,6 @@ get_cluster <- function(graph_releases, clust_releases, name_node_selected = NA)
   
   return(graph_contracted)
 }
-
-
-vertex_attr_names(graph_contracted)
-length(V(graph_contracted))
-length(E(graph_contracted))
-
-V(graph_contracted)$label <- paste0(V(graph_contracted)$name, " - ", V(graph_contracted)$qty_nodes)
-plot(graph_contracted)
-
-
 
 aggregate_node_attributes <- function(graph_clusters, qty_authoritative){
   
@@ -142,17 +81,29 @@ aggregate_node_attributes <- function(graph_clusters, qty_authoritative){
   return(df_nodes)
 }
 
+# Make a subcluster of the chosen cluster one level lower than previous
+graph_selected <- get_cluster(graph_releases, clust_releases)
+V(graph_selected)$label <- paste0(V(graph_selected)$name, " - ", 
+                                  V(graph_selected)$qty_nodes, "\n",
+                                  V(graph_selected)$name_performer
+                                  )
+plot(graph_selected)
 
+name_node_selected <- "p_1003228"
+graph_selected <- get_cluster(graph_releases, clust_releases, name_node_selected)
+V(graph_selected)$label <- paste0(V(graph_selected)$name, " - ", 
+                                  V(graph_selected)$qty_nodes, "\n",
+                                  V(graph_selected)$name_performer
+)
+V(graph_selected)[name_node_selected]$name_performer
+plot(graph_selected)
 
+name_node_selected <- "p_2184902"
+V(graph_selected)$label <- paste0(V(graph_selected)$name, " - ", 
+                                  V(graph_selected)$qty_nodes, "\n",
+                                  V(graph_selected)$name_performer
+)
+V(graph_selected)[name_node_selected]$name_performer
+plot(graph_selected)
 
-
-graph_contracted <- contract(graph_clusters, V(graph_clusters)$cluster,
-                             vertex.attr.comb = list(cluster="first", "ignore"))
-
-list.vertex.attributes(graph_clusters)
-
-graph_clusters_simple <- simplify(graph_clusters)
-V(graph_clusters_simple)$label <- ""
-table(V(graph_clusters_simple)$cluster)
-
-plot(graph_clusters_simple)
+# Gets stuck at a level
