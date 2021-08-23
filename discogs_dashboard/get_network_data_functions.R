@@ -1,3 +1,5 @@
+options(dplyr.summarise.inform = FALSE)
+
 # Network clustering ----
 get_artist_clusters <- function(do_cluster_calculation) {
   # Get a graph with all artists and releases

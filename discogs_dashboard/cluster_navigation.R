@@ -1,3 +1,5 @@
+options(dplyr.summarise.inform = FALSE)
+
 cluster_to_network <- function(graph_cluster){
   
   df_nodes <- as_data_frame(graph_clusters, what = "vertices")
