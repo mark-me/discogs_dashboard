@@ -112,5 +112,7 @@ get_graph_releases <- function() {
   # Remove mutually affirming edges
   graph_reduced <- simplify(graph_reduced)
   
+  V(graph_reduced)$qty_edges <- degree(graph_reduced)
+  
   return(graph_reduced)
 }
