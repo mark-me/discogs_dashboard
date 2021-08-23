@@ -35,7 +35,7 @@ lst_ego_graphs <- decompose(graph)
 lst_length <- lapply
 
 vec_length <- c()
-for(i %in% 1:length(lst_ego_graphs)){
+for(i in 1:length(lst_ego_graphs)){
   print(i)
   # vec_length <- c(vec_length, lst_ego_graphs[[i]])
 }
