@@ -17,6 +17,8 @@ library(yaml)
 library(scales)
 library(ggimage)
 library(visNetwork)
+source("discogs_dashboard/get_network_data_functions.R")
+source("discogs_dashboard/cluster_navigation.R")
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -44,6 +46,10 @@ ui <- fluidPage(
 # Define server logic required to draw a histogram
 server <- function(input, output) {
 
+    config <- read_yaml("discogs_dashboard/config.yml")
+    graph_releases <- get_artist_clusters(FALSE)
+    clust_releases <- read_rds(config$file_cluster_results)
+    
     output$distPlot <- renderPlot({
         # generate bins based on input$bins from ui.R
         x    <- faithful[, 2]

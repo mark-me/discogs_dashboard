@@ -1,49 +1,13 @@
-library(httr)
-library(rjson)
-library(tidyverse)
-library(magrittr)
-library(yaml)
-library(RSQLite)
-library(igraph)
-library(visNetwork)
-
-source("data-prep/get_network_data_functions.R")
-source("data-prep/calculate_artist_similarity.R")
-config <- read_yaml("config.yml")
-
-graph_releases <- get_artist_clusters(FALSE)
-clust_releases <- read_rds("cluster_edge_betweenness.rds")
-
-aggregate_node_attributes <- function(graph_clusters, qty_authoritative){
+cluster_to_network <- function(graph_cluster){
   
   df_nodes <- as_data_frame(graph_clusters, what = "vertices")
+  df_edges <- as_data_frame(graph_clusters, what = "edges")
   
-  # Find _qty_authoritative_ most authoritative performers
-  df_authoritative <- df_nodes %>% 
-    arrange(desc(qty_edges)) %>% 
-    group_by(cluster) %>% 
-    mutate(idx_row_qty_edges = row_number()) %>% 
-    ungroup() %>% 
-    mutate(name_performer = ifelse(idx_row_qty_edges > 3, "", name_node)) %>% 
-    group_by(cluster) %>% 
-    mutate(name_performer_clust = paste(name_performer, collapse = "\n")) %>% 
-    ungroup() %>% 
-    mutate(name_performer_clust = str_trim(name_performer_clust)) %>% 
-    select(name, name_performer_clust)
-
-  df_nodes %<>%
-    left_join(df_authoritative, by = "name") %>% 
-    group_by(cluster) %>% 
-    mutate(qty_nodes_clust      = n(),
-           qty_releases_clust   = sum(qty_releases, na.rm = TRUE),
-           qty_collection_clust = sum(qty_collection_items, na.rm = TRUE)) %>% 
-    ungroup() %>% 
-    select(name, cluster, name_performer_clust, qty_nodes_clust, qty_releases_clust, qty_collection_clust)
-  
-  return(df_nodes)
+  return(list(df_nodes = df_nodes,
+              df_edges = df_edges))
 }
 
-get_next_iter <- function(graph_rel, res_clust, search_item, search_item_previous = NA){
+get_cluster <- function(graph_rel, res_clust, search_item, search_item_previous = NA){
 
   # Iterate through network from top down   
   if(is.na(search_item_previous)){
@@ -99,6 +63,34 @@ aggregate_network <- function(graph_clusters){
   return(graph_contracted)
 }
 
+aggregate_node_attributes <- function(graph_clusters, qty_authoritative){
+  
+  df_nodes <- as_data_frame(graph_clusters, what = "vertices")
+  
+  # Find _qty_authoritative_ most authoritative performers
+  df_authoritative <- df_nodes %>% 
+    arrange(desc(qty_edges)) %>% 
+    group_by(cluster) %>% 
+    mutate(idx_row_qty_edges = row_number()) %>% 
+    ungroup() %>% 
+    mutate(name_performer = ifelse(idx_row_qty_edges > 3, "", name_node)) %>% 
+    group_by(cluster) %>% 
+    mutate(name_performer_clust = paste(name_performer, collapse = "\n")) %>% 
+    ungroup() %>% 
+    mutate(name_performer_clust = str_trim(name_performer_clust)) %>% 
+    select(name, name_performer_clust)
+  
+  df_nodes %<>%
+    left_join(df_authoritative, by = "name") %>% 
+    group_by(cluster) %>% 
+    mutate(qty_nodes_clust      = n(),
+           qty_releases_clust   = sum(qty_releases, na.rm = TRUE),
+           qty_collection_clust = sum(qty_collection_items, na.rm = TRUE)) %>% 
+    ungroup() %>% 
+    select(name, cluster, name_performer_clust, qty_nodes_clust, qty_releases_clust, qty_collection_clust)
+  
+  return(df_nodes)
+}
 
 plot_clusters <- function(graph_clust){
   V(graph_clust)$label <- paste0(V(graph_clust)$cluster, " - ", 
@@ -111,49 +103,50 @@ plot_clusters <- function(graph_clust){
   plot(graph_clust)
 }
 
-# Create test search path
-lst_search_item <- list()
-i <- 1
-lst_search_item[[i]] <- list()
-lst_search_item[[i]] <- get_next_iter(graph_rel   = graph_releases,
+test_navigation <- function(){
+  # Create test search path
+  lst_search_item <- list()
+  i <- 1
+  lst_search_item[[i]] <- list()
+  lst_search_item[[i]] <- get_cluster(graph_rel   = graph_releases,
                                       res_clust   = clust_releases, 
                                       search_item = lst_search_item[[i]])
-
-plot_clusters(lst_search_item[[i]]$graph)
-
-i <- i + 1
-lst_search_item[[i]] <- list(id_cluster_selected = 3)
-lst_search_item[[i]] <- get_next_iter(graph_rel   = graph_releases,
+  
+  plot_clusters(lst_search_item[[i]]$graph)
+  
+  i <- i + 1
+  lst_search_item[[i]] <- list(id_cluster_selected = 3)
+  lst_search_item[[i]] <- get_cluster(graph_rel   = graph_releases,
                                       res_clust   = clust_releases, 
                                       search_item = lst_search_item[[i]],
                                       search_item_previous = lst_search_item[[i-1]])
-
-plot_clusters(lst_search_item[[2]]$graph)
-
-i <- i + 1
-lst_search_item[[i]] <- list(id_cluster_selected = 225)
-lst_search_item[[i]] <- get_next_iter(graph_rel   = graph_releases,
+  
+  plot_clusters(lst_search_item[[2]]$graph)
+  
+  i <- i + 1
+  lst_search_item[[i]] <- list(id_cluster_selected = 225)
+  lst_search_item[[i]] <- get_cluster(graph_rel   = graph_releases,
                                       res_clust   = clust_releases, 
                                       search_item = lst_search_item[[i]],
                                       search_item_previous = lst_search_item[[i-1]])
-
-plot_clusters(lst_search_item[[i]]$graph)
-
-i <- i + 1
-lst_search_item[[i]] <- list(id_cluster_selected = 771)
-lst_search_item[[i]] <- get_next_iter(graph_rel   = graph_releases,
+  
+  plot_clusters(lst_search_item[[i]]$graph)
+  
+  i <- i + 1
+  lst_search_item[[i]] <- list(id_cluster_selected = 771)
+  lst_search_item[[i]] <- get_cluster(graph_rel   = graph_releases,
                                       res_clust   = clust_releases, 
                                       search_item = lst_search_item[[i]],
                                       search_item_previous = lst_search_item[[i-1]])
-
-plot_clusters(lst_search_item[[i]]$graph)
-
-i <- i + 1
-lst_search_item[[i]] <- list(id_cluster_selected = 371)
-lst_search_item[[i]] <- get_next_iter(graph_rel   = graph_releases,
+  
+  plot_clusters(lst_search_item[[i]]$graph)
+  
+  i <- i + 1
+  lst_search_item[[i]] <- list(id_cluster_selected = 371)
+  lst_search_item[[i]] <- get_cluster(graph_rel   = graph_releases,
                                       res_clust   = clust_releases, 
                                       search_item = lst_search_item[[i]],
                                       search_item_previous = lst_search_item[[i-1]])
-
-plot_clusters(lst_search_item[[i]]$graph)
-
+  
+  plot_clusters(lst_search_item[[i]]$graph)
+}

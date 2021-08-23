@@ -10,7 +10,7 @@ get_artist_clusters <- function(do_cluster_calculation) {
   if(do_cluster_calculation){
     
     clust <- cluster_edge_betweenness(graph_releases, weights = NULL, directed = FALSE)
-    write_rds(clust, "cluster_edge_betweenness.rds")
+    write_rds(clust, config$file_cluster_results)
     
     # Get all cluster hierarchies ----
     name_table <- "node_community_hierarchy"
@@ -43,7 +43,7 @@ get_artist_clusters <- function(do_cluster_calculation) {
     }
     
   } else {
-    clust_releases <- read_rds("cluster_edge_betweenness.rds")
+    clust_releases <- read_rds(config$file_cluster_results)
   }
   
   # Assign cluster membership to nodes
@@ -52,7 +52,32 @@ get_artist_clusters <- function(do_cluster_calculation) {
   return(graph_releases)
 }
 
-# Networks ----
+# Network graphs ----
+get_graph_releases <- function() {
+  
+  lst_network <- get_release_network()
+  
+  graph_all <- graph_from_data_frame(lst_network$df_edges, 
+                                     vertices = lst_network$df_nodes, 
+                                     directed = FALSE)
+  
+  # Remove the artists from the network
+  performers_with_release <- V(graph_all)$qty_releases > 0
+  qty_node_edges <- degree(graph_all)
+  multiple_edges <- V(graph_all)$name %in% names(qty_node_edges[qty_node_edges > 1])
+  keep <- performers_with_release | multiple_edges
+  remove <- !keep
+  graph_reduced <- delete_vertices(graph_all, V(graph_all)[remove])
+  
+  # Remove mutually affirming edges
+  graph_reduced <- simplify(graph_reduced)
+  
+  V(graph_reduced)$qty_edges <- degree(graph_reduced)
+  
+  return(graph_reduced)
+}
+
+# Networks data frames----
 get_release_network <- function(){
 
   nw_performers <- get_performer_network()

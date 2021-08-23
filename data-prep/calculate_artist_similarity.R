@@ -93,26 +93,3 @@ calculate_performer_similarity <- function(recalculate = FALSE){
   return(df_artist_mds)
 }
 
-get_graph_releases <- function() {
-  
-  lst_network <- get_release_network()
-  
-  graph_all <- graph_from_data_frame(lst_network$df_edges, 
-                                     vertices = lst_network$df_nodes, 
-                                     directed = FALSE)
-  
-  # Remove the artists from the network
-  performers_with_release <- V(graph_all)$qty_releases > 0
-  qty_node_edges <- degree(graph_all)
-  multiple_edges <- V(graph_all)$name %in% names(qty_node_edges[qty_node_edges > 1])
-  keep <- performers_with_release | multiple_edges
-  remove <- !keep
-  graph_reduced <- delete_vertices(graph_all, V(graph_all)[remove])
-  
-  # Remove mutually affirming edges
-  graph_reduced <- simplify(graph_reduced)
-  
-  V(graph_reduced)$qty_edges <- degree(graph_reduced)
-  
-  return(graph_reduced)
-}
