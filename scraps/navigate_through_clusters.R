@@ -43,7 +43,7 @@ aggregate_node_attributes <- function(graph_clusters, qty_authoritative){
   return(df_nodes)
 }
 
-get_next_iter <- function(res_clust, search_item, search_item_previous = NA){
+get_next_iter <- function(graph_rel, res_clust, search_item, search_item_previous = NA){
 
   # Iterate through network from top down   
   if(is.na(search_item_previous)){
@@ -68,10 +68,15 @@ get_next_iter <- function(res_clust, search_item, search_item_previous = NA){
 
   }
   
+  V(graph_rel)$cluster             <- id_communities
+  V(graph_rel)$is_cluster_selected <- is_cluster_selected
+  graph_aggr <- aggregate_network(graph_rel)
+  
   search_item = append(search_item, 
                        list(qty_steps = qty_steps,
                             id_communities = id_communities,
-                            is_cluster_selected = is_cluster_selected))  
+                            is_cluster_selected = is_cluster_selected,
+                            graph = graph_aggr))  
   return(search_item)
 }
 
@@ -86,64 +91,69 @@ aggregate_network <- function(graph_clusters){
   V(graph_clusters)[df_agg_node_attr$name]$qty_releases   <- df_agg_node_attr$qty_releases_clust
   
   # Create a aggregated graph
-  graph_contracted <- contract(graph_clusters, V(graph_clusters)$cluster,
-                               vertex.attr.comb = list("first"))
+  graph_contracted <- contract(graph_clusters, V(graph_clusters)$cluster, vertex.attr.comb = list("first"))
   graph_contracted <- simplify(graph_contracted)
-  
   graph_contracted <- delete_vertices(graph_contracted, 
-                                      V(graph_contracted)[!V(graph_contracted)$is_selected])
+                                      V(graph_contracted)[!V(graph_contracted)$is_cluster_selected])
   
   return(graph_contracted)
 }
 
 
+plot_clusters <- function(graph_clust){
+  V(graph_clust)$label <- paste0(V(graph_clust)$cluster, " - ", 
+                                V(graph_clust)$qty_nodes, "\n",
+                                V(graph_clust)$name_performer
+  )
+  
+  V(graph_clust)$color <- ifelse(!is.na(V(graph_clust)$type_release), "yellow", "orange")
+  
+  plot(graph_clust)
+}
+
 # Create test search path
 lst_search_item <- list()
-lst_search_item[[1]] <- list()
+i <- 1
+lst_search_item[[i]] <- list()
+lst_search_item[[i]] <- get_next_iter(graph_rel   = graph_releases,
+                                      res_clust   = clust_releases, 
+                                      search_item = lst_search_item[[i]])
 
-lst_search_item[[1]] <- get_next_iter(clust_releases, 
-                                      search_item = lst_search_item[[1]])
+plot_clusters(lst_search_item[[i]]$graph)
 
-search_item <- lst_search_item[[1]]
-graph_clusters <- graph_releases 
-V(graph_clusters)$cluster <- search_item$id_communities
-V(graph_clusters)$is_selected <- search_item$is_cluster_selected
-graph_aggr <- aggregate_network(graph_clusters)
-V(graph_aggr)$label <- paste0(V(graph_aggr)$cluster, " - ", 
-                              V(graph_aggr)$qty_nodes, "\n",
-                              V(graph_aggr)$name_performer
-                              )
-plot(graph_aggr)
+i <- i + 1
+lst_search_item[[i]] <- list(id_cluster_selected = 3)
+lst_search_item[[i]] <- get_next_iter(graph_rel   = graph_releases,
+                                      res_clust   = clust_releases, 
+                                      search_item = lst_search_item[[i]],
+                                      search_item_previous = lst_search_item[[i-1]])
 
-lst_search_item[[2]] <- list(id_cluster_selected = 3)
-lst_search_item[[2]] <- get_next_iter(clust_releases, 
-                                      search_item = lst_search_item[[2]],
-                                      search_item_previous = lst_search_item[[1]])
+plot_clusters(lst_search_item[[2]]$graph)
 
-search_item <- lst_search_item[[2]]
-graph_clusters <- graph_releases 
-V(graph_clusters)$cluster     <- search_item$id_communities
-V(graph_clusters)$is_selected <- search_item$is_cluster_selected
-graph_aggr <- aggregate_network(graph_clusters)
-V(graph_aggr)$label <- paste0(V(graph_aggr)$cluster, " - ", 
-                              V(graph_aggr)$qty_nodes, "\n",
-                              V(graph_aggr)$name_performer
-)
-plot(graph_aggr)
+i <- i + 1
+lst_search_item[[i]] <- list(id_cluster_selected = 225)
+lst_search_item[[i]] <- get_next_iter(graph_rel   = graph_releases,
+                                      res_clust   = clust_releases, 
+                                      search_item = lst_search_item[[i]],
+                                      search_item_previous = lst_search_item[[i-1]])
 
+plot_clusters(lst_search_item[[i]]$graph)
 
-lst_search_item[[3]] <- list(id_cluster_selected = 225)
-lst_search_item[[3]] <- get_next_iter(clust_releases, 
-                                      search_item = lst_search_item[[3]],
-                                      search_item_previous = lst_search_item[[2]])
+i <- i + 1
+lst_search_item[[i]] <- list(id_cluster_selected = 771)
+lst_search_item[[i]] <- get_next_iter(graph_rel   = graph_releases,
+                                      res_clust   = clust_releases, 
+                                      search_item = lst_search_item[[i]],
+                                      search_item_previous = lst_search_item[[i-1]])
 
-search_item <- lst_search_item[[3]]
-graph_clusters <- graph_releases 
-V(graph_clusters)$cluster <- search_item$id_communities
-V(graph_clusters)$is_selected <- search_item$is_cluster_selected
-graph_aggr <- aggregate_network(graph_clusters)
-V(graph_aggr)$label <- paste0(V(graph_aggr)$cluster, " - ", 
-                              V(graph_aggr)$qty_nodes, "\n",
-                              V(graph_aggr)$name_performer
-)
-plot(graph_aggr)
+plot_clusters(lst_search_item[[i]]$graph)
+
+i <- i + 1
+lst_search_item[[i]] <- list(id_cluster_selected = 371)
+lst_search_item[[i]] <- get_next_iter(graph_rel   = graph_releases,
+                                      res_clust   = clust_releases, 
+                                      search_item = lst_search_item[[i]],
+                                      search_item_previous = lst_search_item[[i-1]])
+
+plot_clusters(lst_search_item[[i]]$graph)
+
