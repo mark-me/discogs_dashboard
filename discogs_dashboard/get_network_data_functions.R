@@ -152,6 +152,7 @@ get_performer_network <- function(file_db){
   )
   
   df_nodes %<>%
+    mutate(is_active = ifelse(is.na(is_active), TRUE, is_active)) %>% 
     group_by(id_node, name_node) %>% 
     summarise(across(name_artist_real:url_thumbnail, ~ first(.x, order_by = .x)),
               qty_collection_items = sum(qty_collection_items, na.rm = TRUE),
@@ -325,7 +326,8 @@ get_master_nodes <- function(file_db){
   
   df_result %<>% 
     filter(role %in% c("Main", "Producer", "Co-producer", "Mixed by", "Remix")) %>% 
-    mutate(in_collection = !is.na(id_instance)) %>% 
+    mutate(in_collection = !is.na(id_instance),
+           year = ifelse(is.na(year), 9999, year)) %>% 
     rename(id_node = id_release) %>% 
     group_by(id_node) %>% 
     summarise(name_node = first(title, order_by = year) ,
@@ -333,7 +335,8 @@ get_master_nodes <- function(file_db){
               in_collection = max(in_collection),
               url_thumbnail = first(image_thumbnail, order_by = year)) %>% 
     ungroup() %>% 
-    mutate(type_release = "release",
+    mutate(year = ifelse(year == 9999, NA, year),
+           type_release = "release",
            id_node = paste0("r_", id_node))
   dbDisconnect(db_conn)
   

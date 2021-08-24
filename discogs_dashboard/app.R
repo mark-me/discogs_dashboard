@@ -51,8 +51,7 @@ server <- function(input, output) {
                                           file_cluster_result = config$file_cluster_results,
                                           do_cluster_calculation = FALSE)
     clust_releases <- read_rds(config$file_cluster_results)
-    print(config$file_cluster_results)
-    print(getwd())
+
     output$distPlot <- renderPlot({
         # generate bins based on input$bins from ui.R
         x    <- faithful[, 2]
