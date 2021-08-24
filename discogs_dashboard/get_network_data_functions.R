@@ -1,9 +1,9 @@
 options(dplyr.summarise.inform = FALSE)
 
 # Network clustering ----
-get_artist_clusters <- function(do_cluster_calculation) {
+get_artist_clusters <- function(file_db, file_cluster_result, do_cluster_calculation) {
   # Get a graph with all artists and releases
-  graph_releases <- get_graph_releases()
+  graph_releases <- get_graph_releases(file_db)
   
   # Removing non-connecting releases
   release_single_performer <- !is.na(V(graph_releases)$type_release) & V(graph_releases)$qty_edges == 1
@@ -11,41 +11,43 @@ get_artist_clusters <- function(do_cluster_calculation) {
   
   if(do_cluster_calculation){
     
-    clust <- cluster_edge_betweenness(graph_releases, weights = NULL, directed = FALSE)
-    write_rds(clust, config$file_cluster_results)
+    # Do actual clustering 
+    clust_releases <- cluster_edge_betweenness(graph_releases, weights = NULL, directed = FALSE)
+    write_rds(clust_releases, file_cluster_result)
     
-    # Get all cluster hierarchies ----
+    # Get all cluster hierarchies
     name_table <- "node_community_hierarchy"
-    db_discogs <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
+    db_discogs <- dbConnect(RSQLite::SQLite(), file_db)
     
-    # Find the minimum of communities
-    res_cut <- cut_at(clust_releases, no = 1)
-    qty_communities_min <- max(res_cut)
-    
-    # Getting all community memberships from top to bottom of the hierarchy
-    qty_communities <- qty_communities_min
-    idx_step <- 1
-    lst_communities <- list()
-    while(qty_communities < length(clust_releases$membership)){
-      
-      no_communities <- qty_communities_min + idx_step
-      id_communities <- cut_at(clust_releases, no = no_communities)
-      qty_communities <- max(id_communities)
-      
-      df_communitiy_membership <- tibble(
-        id_node = V(graph_releases)$name,
-        idx_step = rep(idx_step, length(id_communities)),
-        id_community = id_communities
-      )
-      
-      has_table <- dbExistsTable(db_discogs, name_table)
-      dbWriteTable(db_discogs, name_table, df_communitiy_membership, overwrite = !has_table, append = has_table)
-      
-      idx_step <- idx_step + 1
-    }
+    # Write cluster membership of all vertices throughout the hierarchy (superfluous, is part of the clust_releases object)
+    # # Find the minimum of communities
+    # res_cut <- cut_at(clust_releases, no = 1)
+    # qty_communities_min <- max(res_cut)
+    # 
+    # # Getting all community memberships from top to bottom of the hierarchy
+    # qty_communities <- qty_communities_min
+    # idx_step <- 1
+    # lst_communities <- list()
+    # while(qty_communities < length(clust_releases$membership)){
+    #   
+    #   no_communities <- qty_communities_min + idx_step
+    #   id_communities <- cut_at(clust_releases, no = no_communities)
+    #   qty_communities <- max(id_communities)
+    #   
+    #   df_communitiy_membership <- tibble(
+    #     id_node = V(graph_releases)$name,
+    #     idx_step = rep(idx_step, length(id_communities)),
+    #     id_community = id_communities
+    #   )
+    #   
+    #   has_table <- dbExistsTable(db_discogs, name_table)
+    #   dbWriteTable(db_discogs, name_table, df_communitiy_membership, overwrite = !has_table, append = has_table)
+    #   
+    #   idx_step <- idx_step + 1
+    # }
     
   } else {
-    clust_releases <- read_rds(config$file_cluster_results)
+    clust_releases <- read_rds(file_cluster_result)
   }
   
   # Assign cluster membership to nodes
@@ -55,9 +57,9 @@ get_artist_clusters <- function(do_cluster_calculation) {
 }
 
 # Network graphs ----
-get_graph_releases <- function() {
+get_graph_releases <- function(file_db) {
   
-  lst_network <- get_release_network()
+  lst_network <- get_release_network(file_db)
   
   graph_all <- graph_from_data_frame(lst_network$df_edges, 
                                      vertices = lst_network$df_nodes, 
@@ -80,15 +82,15 @@ get_graph_releases <- function() {
 }
 
 # Networks data frames----
-get_release_network <- function(){
+get_release_network <- function(file_db){
 
-  nw_performers <- get_performer_network()
+  nw_performers <- get_performer_network(file_db)
   
   df_nodes <- bind_rows(nw_performers$df_nodes, 
-                        get_master_nodes() %>% mutate(type_node = "release"))
+                        get_master_nodes(file_db) %>% mutate(type_node = "release"))
 
   df_edges <- bind_rows(nw_performers$df_edges, 
-                        get_master_edges())
+                        get_master_edges(file_db))
   
   df_edges %<>% 
     filter(from %in% df_nodes$id_node)
@@ -112,12 +114,12 @@ get_release_network <- function(){
   return(lst_network)
 }
 
-get_collection_network <- function(){
+get_collection_network <- function(file_db){
   
-  df_nodes <- bind_rows(get_performer_nodes() %>% mutate(type_node = "performer"),
-                        get_item_nodes() %>% mutate(type_node = "collection_item"))
-  df_edges <- bind_rows(get_performer_edges(),
-                        get_collection_item_edges()) %>% 
+  df_nodes <- bind_rows(get_performer_nodes(file_db) %>% mutate(type_node = "performer"),
+                        get_item_nodes(file_db) %>% mutate(type_node = "collection_item"))
+  df_edges <- bind_rows(get_performer_edges(file_db),
+                        get_collection_item_edges(file_db)) %>% 
     filter(from %in% df_nodes$id_node)
   
   # Find the number of releases per performer
@@ -140,13 +142,13 @@ get_collection_network <- function(){
   return(lst_network)
 }
 
-get_performer_network <- function(){
+get_performer_network <- function(file_db){
   
   df_nodes <- bind_rows(
-    get_artist_nodes(),
-    get_member_nodes(),
-    get_group_nodes(),
-    get_alias_nodes()
+    get_artist_nodes(file_db),
+    get_member_nodes(file_db),
+    get_group_nodes(file_db),
+    get_alias_nodes(file_db)
   )
   
   df_nodes %<>%
@@ -159,7 +161,7 @@ get_performer_network <- function(){
     mutate(type_node = "performer")
   
   # Add performer roles
-  db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
+  db_conn <- dbConnect(RSQLite::SQLite(), file_db)
   
   res <- dbSendQuery(db_conn, paste0("SELECT id_artist, role, COUNT(*) as qty_roles 
                                       FROM artist_releases
@@ -201,9 +203,9 @@ get_performer_network <- function(){
   
   # Collect edges
   df_edges <- bind_rows(
-    get_membership_edges(),
-    get_group_edges(),
-    get_alias_edges()
+    get_membership_edges(file_db),
+    get_group_edges(file_db),
+    get_alias_edges(file_db)
   ) %>% unique()
   
   # Combine into network list data frames
@@ -216,9 +218,9 @@ get_performer_network <- function(){
 }
 
 # Nodes ----
-get_artist_nodes <- function(){
+get_artist_nodes <- function(file_db){
   
-  db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
+  db_conn <- dbConnect(RSQLite::SQLite(), file_db)
   
   res <- dbSendQuery(db_conn, paste0("SELECT * FROM artists"))
   df_artist_result <- dbFetch(res)
@@ -239,9 +241,9 @@ get_artist_nodes <- function(){
   return(df_artist_result)  
 }
 
-get_member_nodes <- function(){
+get_member_nodes <- function(file_db){
   
-  db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
+  db_conn <- dbConnect(RSQLite::SQLite(), file_db)
   
   res <- dbSendQuery(db_conn, paste0("SELECT * FROM artist_members"))
   df_result <- dbFetch(res)
@@ -257,9 +259,9 @@ get_member_nodes <- function(){
   return(df_result)  
 }
 
-get_group_nodes <- function(){
+get_group_nodes <- function(file_db){
   
-  db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
+  db_conn <- dbConnect(RSQLite::SQLite(), file_db)
   
   res <- dbSendQuery(db_conn, paste0("SELECT * FROM artist_groups"))
   df_result <- dbFetch(res)
@@ -275,9 +277,9 @@ get_group_nodes <- function(){
   return(df_result)  
 }
 
-get_alias_nodes <- function(){
+get_alias_nodes <- function(file_db){
   
-  db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
+  db_conn <- dbConnect(RSQLite::SQLite(), file_db)
   
   res <- dbSendQuery(db_conn, paste0("SELECT * FROM artist_aliases"))
   df_result <- dbFetch(res)
@@ -293,9 +295,9 @@ get_alias_nodes <- function(){
   return(df_result)  
 }
 
-get_collection_item_nodes <- function(){
+get_collection_item_nodes <- function(file_db){
   
-  db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
+  db_conn <- dbConnect(RSQLite::SQLite(), file_db)
   
   res <- dbSendQuery(db_conn, paste0("SELECT * FROM collection_items"))
   df_result <- dbFetch(res)
@@ -311,9 +313,9 @@ get_collection_item_nodes <- function(){
   return(df_result)  
 }
 
-get_master_nodes <- function(){
+get_master_nodes <- function(file_db){
   
-  db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
+  db_conn <- dbConnect(RSQLite::SQLite(), file_db)
   
   res <- dbSendQuery(db_conn, paste0("SELECT artist_releases.*, collection_items.id_instance 
                                       FROM artist_releases
@@ -339,9 +341,9 @@ get_master_nodes <- function(){
 }
 
 # Edges ----
-get_membership_edges <- function(){
+get_membership_edges <- function(file_db){
   
-  db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
+  db_conn <- dbConnect(RSQLite::SQLite(), file_db)
   
   res <- dbSendQuery(db_conn, paste0("SELECT id_artist, id_member, is_active FROM artist_members"))
   df_result <- dbFetch(res)
@@ -357,9 +359,9 @@ get_membership_edges <- function(){
   return(df_result)  
 }
 
-get_group_edges <- function(){
+get_group_edges <- function(file_db){
   
-  db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
+  db_conn <- dbConnect(RSQLite::SQLite(), file_db)
   
   res <- dbSendQuery(db_conn, paste0("SELECT id_artist, id_group, is_active FROM artist_groups"))
   df_result <- dbFetch(res)
@@ -375,9 +377,9 @@ get_group_edges <- function(){
   return(df_result)  
 }
 
-get_alias_edges <- function(){
+get_alias_edges <- function(file_db){
   
-  db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
+  db_conn <- dbConnect(RSQLite::SQLite(), file_db)
   
   res <- dbSendQuery(db_conn, paste0("SELECT id_artist, id_alias FROM artist_aliases"))
   df_result <- dbFetch(res)
@@ -393,9 +395,9 @@ get_alias_edges <- function(){
   return(df_result)  
 }
 
-get_collection_item_edges <- function(){
+get_collection_item_edges <- function(file_db){
   
-  db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
+  db_conn <- dbConnect(RSQLite::SQLite(), file_db)
   
   res <- dbSendQuery(db_conn, paste0("SELECT id_artist, id_release FROM collection_artists"))
   df_result <- dbFetch(res)
@@ -411,9 +413,9 @@ get_collection_item_edges <- function(){
   return(df_result)  
 }
 
-get_master_edges <- function(){
+get_master_edges <- function(file_db){
   
-  db_conn <- dbConnect(RSQLite::SQLite(), paste0(config$db_location,"/discogs.sqlite"))
+  db_conn <- dbConnect(RSQLite::SQLite(), file_db)
   
   res <- dbSendQuery(db_conn, paste0("SELECT DISTINCT id_artist, id_release, role
                                      FROM artist_releases"))
