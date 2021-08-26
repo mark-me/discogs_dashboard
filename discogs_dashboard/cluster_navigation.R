@@ -1,8 +1,27 @@
 options(dplyr.summarise.inform = FALSE)
 
-cluster_to_network <- function(graph_cluster){
+plot_network <- function(network){
   
-  df_nodes <- as_data_frame(graph_clusters, what = "vertices")
+  visNetwork(network$df_nodes, network$df_edges
+             , background = "black") %>% 
+    visNodes(
+      color = list(background = "lightblue",
+                   border = "grey",
+                   highlight = "yellow"),
+      font = list(color = "white",
+                  strokeWidth = 3,
+                  strokeColor = alpha("black", alpha = 0.7)),
+      shadow = list(enabled = TRUE, size = 10))  %>%
+    visOptions(highlightNearest = TRUE) %>%
+    visPhysics(maxVelocity = 10)
+}
+
+cluster_to_network <- function(graph_clusters){
+  
+  df_nodes <- as_data_frame(graph_clusters, what = "vertices") %>% 
+    rename(id = name) %>% 
+    mutate(label = paste0(cluster, " - ", qty_nodes, "\n", name_performer))
+  
   df_edges <- as_data_frame(graph_clusters, what = "edges")
   
   return(list(df_nodes = df_nodes,

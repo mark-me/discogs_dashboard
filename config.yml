@@ -1,3 +1,4 @@
 db_location: ~/Development/Datasets/discogs_dashboard
 reload_artist_releases_discogs: FALSE
 discogs_max_calls_minute: 70
+file_cluster_results: cluster_edge_betweenness.rds
