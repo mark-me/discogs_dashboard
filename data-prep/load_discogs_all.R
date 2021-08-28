@@ -10,6 +10,7 @@ source("data-prep/discogs_helper_functions.R")
 source("data-prep/load_discogs_collection.R")
 source("data-prep/load_discogs_artists.R")
 source("data-prep/load_discogs_artist_releases.R")
+source("data-prep/create_network.R")
 
 df_collection_items   <- load_discogs_collection()
 df_collection_artists <- extract_collection_artists(df_collection_items)
@@ -71,4 +72,5 @@ df_artist_members  <- dbReadTable(db_discogs, "artist_members")
 df_artist_urls     <- dbReadTable(db_discogs, "artist_urls")
 df_artist_releases <- dbReadTable(db_discogs, "artist_releases")
 dbDisconnect(db_discogs) 
+
 
