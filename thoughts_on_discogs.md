@@ -27,3 +27,24 @@ Is representative authorative? Artists having been involved of the most releases
 * How do I stop the navigation through clusters?
 * When do do I show releases?
 * Add a cluster for all artists that belong to an exclusive cluster
+
+# 2021-08-29
+
+* Replace releases that connect performers with direct links between performers
+* Create search patterns
+  * id_search_pattern
+  * id_node
+  * is_in_scope
+  * id_cluster
+* Create path
+  * id_search_pattern_from
+  * id_search_pattern_to
+  * qty_steps
+* Show path, navigational options:
+  * To top
+  * Drill down
+  * One back: 
+    * id_time  
+    * id_search_pattern_from
+    * id_search_pattern_to
+    

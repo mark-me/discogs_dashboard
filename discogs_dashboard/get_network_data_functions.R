@@ -23,12 +23,13 @@ get_performer_clusters <- function(nw_performer_releases, file_cluster_result, d
 # Get network data frames ----
 get_performer_master_network <- function(file_db){
   
-  nw_performers <- get_performer_network(file_db)
+  nw_performers <- get_performer_network(file_db) # Get performer network
   
+  # Get master release nodes and edges
   db_conn <- dbConnect(RSQLite::SQLite(), file_db)
-  
   df_master_nodes <- dbReadTable(db_conn, 'nodes_master')
   df_master_edges <- dbReadTable(db_conn, 'edges_master')
+  dbDisconnect(db_conn)
   
   # Find the number of releases per performer
   df_performer_qty_releases <- df_master_edges %>% 
@@ -64,11 +65,12 @@ get_performer_master_network <- function(file_db){
 
 get_performer_network <- function(file_db){
 
+  # Get performer nodes and edges
   db_conn <- dbConnect(RSQLite::SQLite(), file_db)
-  
   df_nodes <- dbReadTable(db_conn, 'nodes_performers')
   df_edges <- dbReadTable(db_conn, 'edges_performers')
-
+  dbDisconnect(db_conn)
+  
   # Find the number of connections to other performers
   df_qty_connections <- rbind(
     df_edges %>% select(id_node_from = from, id_node_to = to),
