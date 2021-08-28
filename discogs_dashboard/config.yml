@@ -1,2 +1,2 @@
 db_location: ~/Development/Datasets/discogs_dashboard
-file_cluster_results: cluster_edge_betweenness.rds
+file_cluster_result: cluster_edge_betweenness.rds
