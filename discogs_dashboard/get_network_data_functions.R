@@ -32,14 +32,14 @@ get_performer_master_network <- function(file_db){
   dbDisconnect(db_conn)
   
   # Find the number of releases per performer
-  df_performer_qty_releases <- df_master_edges %>% 
+  df_performer_qty_masters <- df_master_edges %>% 
     rename(id_node = from) %>% 
     group_by(id_node) %>% 
     summarise(qty_masters = n()) %>% 
     ungroup()
   
   nw_performers$df_nodes %<>%
-    left_join(df_performer_qty_releases, by = "id_node") %>% 
+    left_join(df_performer_qty_masters, by = "id_node") %>% 
     mutate(qty_masters = ifelse(is.na(qty_masters), 0, qty_masters))
   
   # Remove performers without own release and just one performer connection
