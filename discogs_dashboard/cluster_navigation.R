@@ -1,4 +1,152 @@
-options(dplyr.summarise.inform = FALSE)
+library(igraph)
+
+get_clusters <- function(res_clustering, id_step = NA, id_cluster_selected = NA){
+  
+  # If no step is given, the most aggregated level is shown
+  if(is.na(id_step)){
+    id_step    <- length(res_clustering$merges)/2
+    id_cluster <- cut_at(res_clustering, steps = id_step)
+    is_visible <- rep(TRUE, length(id_cluster))
+  } else {
+    # Set the nodes to visible that fall in the selected cluster
+    is_visible <- cut_at(res_clustering, steps = id_step) == id_cluster_selected
+    
+    # Only drill down if there is more than one node in the cluster
+    if(sum(is_visible) > 1){
+      
+      # Drill down the hierarchy until there are at least 6 clusters or the maximum number of nodes is reached
+      qty_clusters_min <- ifelse(sum(is_visible) < 6, sum(is_visible), 6)
+      qty_clusters <- 0
+       while(qty_clusters < qty_clusters_min){
+        
+        id_step      <- id_step - 100  # Taking the number of steps by 100 to speed up the search process
+        id_cluster   <- cut_at(res_clustering, steps = id_step)
+        qty_clusters <- length(unique(id_cluster[is_visible]))
+      }      
+    } else {
+      id_cluster   <- cut_at(res_clustering, steps = id_step)
+    }
+  }
+  
+  lst_search <- list(
+    id_step_hierarchy = id_step,
+    df_cluster = tibble(id_nodes   = res_clustering$names,
+                        id_cluster = id_cluster,
+                        is_visible = is_visible)
+  )
+  return(lst_search)
+}
+
+aggregate_node_attributes <- function(graph_clusters, qty_authoritative){
+
+  # Find most authoritative performers based on number of connections
+  qty_node_edges <- degree(graph_clusters)
+  V(graph_clusters)$qty_edges <- qty_node_edges
+    
+  df_nodes <- as_data_frame(graph_clusters, what = "vertices")
+
+  # Find _qty_authoritative_ most authoritative performers
+  df_authoritative <- df_nodes %>% 
+    arrange(desc(qty_edges)) %>% 
+    group_by(id_cluster) %>% 
+    mutate(idx_row_qty_edges = ifelse(type_node == "performer", row_number(), NA)) %>% 
+    ungroup() %>% 
+    mutate(name_performer = ifelse(idx_row_qty_edges <= qty_authoritative, name_node, NA)) %>% 
+    group_by(id_cluster) %>% 
+    mutate(name_performer_clust = paste(na.omit(name_performer), collapse = "\n")) %>% 
+    ungroup() %>%
+    select(name, name_performer_clust)
+  
+  df_nodes %<>%
+    left_join(df_authoritative, by = "name") %>% 
+    group_by(id_cluster) %>% 
+    mutate(qty_nodes_clust      = n(),
+           qty_masters_clust   = sum(qty_masters, na.rm = TRUE),
+           qty_collection_clust = sum(qty_collection_items, na.rm = TRUE)) %>% 
+    ungroup() %>% 
+    select(name, id_cluster, name_performer_clust, qty_nodes_clust, qty_masters_clust, qty_collection_clust)
+
+  # Count performers and releases per node
+  df_nodes %<>%
+    group_by(id_cluster) %>% 
+    mutate(qty_performers = ) %>% 
+    ungroup()
+  
+  return(df_nodes)
+}
+
+aggregate_network <- function(graph_clusters){
+  
+  # Aggregate release network to the clusters 
+  df_agg_node_attr <- aggregate_node_attributes(graph_clusters, qty_authoritative = 3)
+  V(graph_clusters)[df_agg_node_attr$name]$name_performer <- df_agg_node_attr$name_performer_clust
+  V(graph_clusters)[df_agg_node_attr$name]$qty_nodes      <- df_agg_node_attr$qty_nodes_clust
+  V(graph_clusters)[df_agg_node_attr$name]$qty_collection <- df_agg_node_attr$qty_collection_clust
+  V(graph_clusters)[df_agg_node_attr$name]$qty_releases   <- df_agg_node_attr$qty_masters_clust
+  
+  # Create a aggregated graph
+  graph_contracted <- contract(graph_clusters, V(graph_clusters)$id_cluster, vertex.attr.comb = list("first"))
+  graph_contracted <- simplify(graph_contracted)
+  graph_contracted <- delete_vertices(graph_contracted, 
+                                      V(graph_contracted)[!V(graph_contracted)$is_cluster_visible])
+  
+  return(graph_contracted)
+}
+
+get_clustered_network <- function(lst_network, lst_search_results = NA, id_cluster_selected = NA){
+  
+  # Get least number of clusters if no previous search results are provided
+  if(is.na(lst_search_results)){
+    lst_search_result <- get_clusters(lst_network$res_clustering)  
+  } else {
+    lst_search_result <- get_clusters(res_clustering = lst_network$res_clustering,
+                                      id_step = lst_search_results[[length(lst_search_results)]]$id_step, 
+                                      id_cluster_selected = id_cluster_selected) 
+  }
+  
+  df_clusters <- tibble(
+    id_node            = lst_search_result$df_cluster$id_nodes,
+    id_cluster         = lst_search_result$df_cluster$id_cluster,
+    is_cluster_visible = lst_search_result$df_cluster$is_visible
+  )
+  
+  # Add cluster ID's to nodes
+  df_nodes <- lst_network$nw_performer_releases$df_nodes
+  df_edges <- lst_network$nw_performer_releases$df_edges
+  df_nodes %<>%
+    left_join(df_clusters, by = "id_node")
+  
+  # Non-connecting release nodes won't have a cluster ID. They will get the performer's cluster ID 
+  df_non_clustered <- df_nodes %>% 
+    filter(is.na(id_cluster) | is.na(is_cluster_visible)) %>% 
+    select(-id_cluster, -is_cluster_visible) %>% 
+    inner_join(select(df_edges, id_node = to, id_artist = from), 
+               by = "id_node") %>% 
+    inner_join(select(df_nodes, id_artist = id_node, id_cluster, is_cluster_visible),
+               by = "id_artist") %>% 
+    select(id_node, id_cluster_derived = id_cluster, is_visible_derived = is_cluster_visible)
+  
+  df_nodes %<>%
+    left_join(df_non_clustered, by = "id_node") %>% 
+    mutate(id_cluster         = ifelse(is.na(id_cluster), id_cluster_derived, id_cluster),
+           is_cluster_visible = ifelse(is.na(is_cluster_visible), is_visible_derived, is_cluster_visible)) %>% 
+    select(-id_cluster_derived, -is_visible_derived)
+  
+  # Contract network to clusters
+  graph_performer_releases <- graph_from_data_frame(d = df_edges, vertices = df_nodes, directed = FALSE)
+  graph_clusters <- aggregate_network(graph_performer_releases)
+  
+  df_nodes <- as_data_frame(graph_clusters, what = "vertices") %>% rename(id = name)
+  df_edges <- as_data_frame(graph_clusters, what = "edges")
+  
+  lst_search_result <- list(
+    id_step_hierarchy = lst_search_result$id_step_hierarchy,
+    df_cluster_ids    = df_nodes %>% select(id_node, id_cluster, id_cluster_selected),
+    nw_cluster        = list(df_nodes = df_nodes, df_edges = df_edges)
+  )
+  
+  return(lst_search_result)
+}
 
 plot_network <- function(network){
   
@@ -16,158 +164,37 @@ plot_network <- function(network){
     visPhysics(maxVelocity = 10)
 }
 
-cluster_to_network <- function(graph_clusters){
-  
-  df_nodes <- as_data_frame(graph_clusters, what = "vertices") %>% 
-    rename(id = name) %>% 
-    mutate(label = paste0(cluster, " - ", qty_nodes, "\n", name_performer))
-  
-  df_edges <- as_data_frame(graph_clusters, what = "edges")
-  
-  return(list(df_nodes = df_nodes,
-              df_edges = df_edges))
-}
+file_db <- '~/Development/Datasets/discogs_dashboard/discogs.sqlite'
+file_cluster_result <- 'cluster_edge_betweenness.rds'
 
-get_cluster <- function(graph_rel, res_clust, search_item, search_item_previous = NA){
+# Create an object containing the network and its clustering result
+lst_network <- list(
+  nw_performer_releases = get_performer_master_network(file_db),
+  res_clustering        = get_performer_clusters(nw_performer_releases, 
+                                                 file_cluster_result, 
+                                                 do_cluster_calculation = FALSE)
+)
 
-  # Iterate through network from top down   
-  if(is.na(search_item_previous)){
-    
-    qty_steps <- length(res_clust$merges)/2
-    id_communities <- cut_at(res_clust, steps = qty_steps)
-    is_cluster_selected <- rep(TRUE, length(id_communities))
-
-  } else {
-    
-    qty_steps <- search_item_previous$qty_steps - 1
-    is_cluster_selected <- search_item_previous$id_communities == search_item$id_cluster_selected
-    
-    qty_clusters_min <- 6
-    qty_clusters <- 0
-    while(qty_clusters < qty_clusters_min){
-      
-      id_communities <- cut_at(res_clust, steps = qty_steps)
-      qty_steps <- qty_steps - 1
-      qty_clusters <- length(unique(id_communities[is_cluster_selected]))
-    }
-
-  }
+example_cluster_navigation <- function(){
   
-  V(graph_rel)$cluster             <- id_communities
-  V(graph_rel)$is_cluster_selected <- is_cluster_selected
-  graph_aggr <- aggregate_network(graph_rel)
+  # A list that will contain search results
+  lst_search_results <- list()
   
-  search_item = append(search_item, 
-                       list(qty_steps = qty_steps,
-                            id_communities = id_communities,
-                            is_cluster_selected = is_cluster_selected,
-                            graph = graph_aggr))  
-  return(search_item)
-}
-
-
-aggregate_network <- function(graph_clusters){
-  
-  # Aggregate release network to the clusters 
-  df_agg_node_attr <- aggregate_node_attributes(graph_clusters, qty_authoritative = 3)
-  V(graph_clusters)[df_agg_node_attr$name]$name_performer <- df_agg_node_attr$name_performer_clust
-  V(graph_clusters)[df_agg_node_attr$name]$qty_nodes      <- df_agg_node_attr$qty_nodes_clust
-  V(graph_clusters)[df_agg_node_attr$name]$qty_collection <- df_agg_node_attr$qty_collection_clust
-  V(graph_clusters)[df_agg_node_attr$name]$qty_releases   <- df_agg_node_attr$qty_releases_clust
-  
-  # Create a aggregated graph
-  graph_contracted <- contract(graph_clusters, V(graph_clusters)$cluster, vertex.attr.comb = list("first"))
-  graph_contracted <- simplify(graph_contracted)
-  graph_contracted <- delete_vertices(graph_contracted, 
-                                      V(graph_contracted)[!V(graph_contracted)$is_cluster_selected])
-  
-  return(graph_contracted)
-}
-
-aggregate_node_attributes <- function(graph_clusters, qty_authoritative){
-  
-  df_nodes <- as_data_frame(graph_clusters, what = "vertices")
-  
-  # Find _qty_authoritative_ most authoritative performers
-  df_authoritative <- df_nodes %>% 
-    arrange(desc(qty_edges)) %>% 
-    group_by(cluster) %>% 
-    mutate(idx_row_qty_edges = row_number()) %>% 
-    ungroup() %>% 
-    mutate(name_performer = ifelse(idx_row_qty_edges > 3, "", name_node)) %>% 
-    group_by(cluster) %>% 
-    mutate(name_performer_clust = paste(name_performer, collapse = "\n")) %>% 
-    ungroup() %>% 
-    mutate(name_performer_clust = str_trim(name_performer_clust)) %>% 
-    select(name, name_performer_clust)
-  
-  df_nodes %<>%
-    left_join(df_authoritative, by = "name") %>% 
-    group_by(cluster) %>% 
-    mutate(qty_nodes_clust      = n(),
-           qty_releases_clust   = sum(qty_releases, na.rm = TRUE),
-           qty_collection_clust = sum(qty_collection_items, na.rm = TRUE)) %>% 
-    ungroup() %>% 
-    select(name, cluster, name_performer_clust, qty_nodes_clust, qty_releases_clust, qty_collection_clust)
-  
-  return(df_nodes)
-}
-
-plot_clusters <- function(graph_clust){
-  V(graph_clust)$label <- paste0(V(graph_clust)$cluster, " - ", 
-                                V(graph_clust)$qty_nodes, "\n",
-                                V(graph_clust)$name_performer
-  )
-  
-  V(graph_clust)$color <- ifelse(!is.na(V(graph_clust)$type_release), "yellow", "orange")
-  
-  plot(graph_clust)
-}
-
-test_navigation <- function(){
-  # Create test search path
-  lst_search_item <- list()
   i <- 1
-  lst_search_item[[i]] <- list()
-  lst_search_item[[i]] <- get_cluster(graph_rel   = graph_releases,
-                                      res_clust   = clust_releases, 
-                                      search_item = lst_search_item[[i]])
+  lst_search_results[[i]] <- get_clustered_network(lst_network, lst_search_results = NA, id_cluster_selected = NA)
+  lst_search_results[[i]]$nw_cluster$df_nodes %<>% 
+    mutate(label = paste0(id_cluster, "-", name_performer))
+  plot_network(lst_search_results[[i]]$nw_cluster)
   
-  plot_clusters(lst_search_item[[i]]$graph)
+  i <- 2
+  lst_search_results[[i]] <- get_clustered_network(lst_network, lst_search_results, id_cluster_selected = 3)
+  lst_search_results[[i]]$nw_cluster$df_nodes %<>% 
+    mutate(label = paste0(id_cluster, "-", name_performer))
+  plot_network(lst_search_results[[i]]$nw_cluster)
   
-  i <- i + 1
-  lst_search_item[[i]] <- list(id_cluster_selected = 3)
-  lst_search_item[[i]] <- get_cluster(graph_rel   = graph_releases,
-                                      res_clust   = clust_releases, 
-                                      search_item = lst_search_item[[i]],
-                                      search_item_previous = lst_search_item[[i-1]])
-  
-  plot_clusters(lst_search_item[[2]]$graph)
-  
-  i <- i + 1
-  lst_search_item[[i]] <- list(id_cluster_selected = 225)
-  lst_search_item[[i]] <- get_cluster(graph_rel   = graph_releases,
-                                      res_clust   = clust_releases, 
-                                      search_item = lst_search_item[[i]],
-                                      search_item_previous = lst_search_item[[i-1]])
-  
-  plot_clusters(lst_search_item[[i]]$graph)
-  
-  i <- i + 1
-  lst_search_item[[i]] <- list(id_cluster_selected = 771)
-  lst_search_item[[i]] <- get_cluster(graph_rel   = graph_releases,
-                                      res_clust   = clust_releases, 
-                                      search_item = lst_search_item[[i]],
-                                      search_item_previous = lst_search_item[[i-1]])
-  
-  plot_clusters(lst_search_item[[i]]$graph)
-  
-  i <- i + 1
-  lst_search_item[[i]] <- list(id_cluster_selected = 371)
-  lst_search_item[[i]] <- get_cluster(graph_rel   = graph_releases,
-                                      res_clust   = clust_releases, 
-                                      search_item = lst_search_item[[i]],
-                                      search_item_previous = lst_search_item[[i-1]])
-  
-  plot_clusters(lst_search_item[[i]]$graph)
+  i <- 3
+  lst_search_results[[i]] <- get_clustered_network(lst_network, lst_search_results, id_cluster_selected = 127)
+  lst_search_results[[i]]$nw_cluster$df_nodes %<>% 
+    mutate(label = paste0(id_cluster, "-", name_performer))
+  plot_network(lst_search_results[[i]]$nw_cluster)  
 }
