@@ -30,7 +30,6 @@ Is representative authorative? Artists having been involved of the most releases
 
 # 2021-08-29
 
-* Replace releases that connect performers with direct links between performers
 * Create search patterns
   * id_search_pattern
   * id_node
@@ -48,3 +47,10 @@ Is representative authorative? Artists having been involved of the most releases
     * id_search_pattern_from
     * id_search_pattern_to
     
+# 2021-09-03
+
+* If a cluster contains only one artist, turn the node into an artist node (give the cluster node only artist attributes)
+* If a cluster contains only releases and is connected to one other cluster, merge it into that cluster
+* If a cluster contains only releases and is connected to multiple nodes, put copies of it's nodes in both clusters and remove the node and create links between the adjoining nodes
+* 
+
