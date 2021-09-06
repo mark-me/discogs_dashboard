@@ -60,17 +60,12 @@ aggregate_node_attributes <- function(graph_clusters, qty_authoritative){
   df_nodes %<>%
     left_join(df_authoritative, by = "name") %>% 
     group_by(id_cluster) %>% 
-    mutate(qty_nodes_clust      = n(),
-           qty_masters_clust   = sum(qty_masters, na.rm = TRUE),
-           qty_collection_clust = sum(qty_collection_items, na.rm = TRUE)) %>% 
+    mutate(qty_nodes      = n(),
+           qty_collection = sum(qty_collection_items, na.rm = TRUE),
+           qty_releases   = sum(type_node == "release"),
+           qty_performers = sum(type_node == "performer")) %>% 
     ungroup() %>% 
-    select(name, id_cluster, name_performer_clust, qty_nodes_clust, qty_masters_clust, qty_collection_clust)
-
-  # Count performers and releases per node
-  df_nodes %<>%
-    group_by(id_cluster) %>% 
-    mutate(qty_performers = ) %>% 
-    ungroup()
+    select(name, id_cluster, name_performer_clust, qty_edges, qty_nodes, qty_collection, qty_releases, qty_performers)
   
   return(df_nodes)
 }
@@ -80,9 +75,11 @@ aggregate_network <- function(graph_clusters){
   # Aggregate release network to the clusters 
   df_agg_node_attr <- aggregate_node_attributes(graph_clusters, qty_authoritative = 3)
   V(graph_clusters)[df_agg_node_attr$name]$name_performer <- df_agg_node_attr$name_performer_clust
-  V(graph_clusters)[df_agg_node_attr$name]$qty_nodes      <- df_agg_node_attr$qty_nodes_clust
-  V(graph_clusters)[df_agg_node_attr$name]$qty_collection <- df_agg_node_attr$qty_collection_clust
-  V(graph_clusters)[df_agg_node_attr$name]$qty_releases   <- df_agg_node_attr$qty_masters_clust
+  V(graph_clusters)[df_agg_node_attr$name]$qty_nodes      <- df_agg_node_attr$qty_nodes
+  V(graph_clusters)[df_agg_node_attr$name]$qty_edges      <- df_agg_node_attr$qty_edges
+  V(graph_clusters)[df_agg_node_attr$name]$qty_collection <- df_agg_node_attr$qty_collection
+  V(graph_clusters)[df_agg_node_attr$name]$qty_releases   <- df_agg_node_attr$qty_releases
+  V(graph_clusters)[df_agg_node_attr$name]$qty_performers <- df_agg_node_attr$qty_performers
   
   # Create a aggregated graph
   graph_contracted <- contract(graph_clusters, V(graph_clusters)$id_cluster, vertex.attr.comb = list("first"))
@@ -141,7 +138,7 @@ get_clustered_network <- function(lst_network, lst_search_results = NA, id_clust
   
   lst_search_result <- list(
     id_step_hierarchy = lst_search_result$id_step_hierarchy,
-    df_cluster_ids    = df_nodes %>% select(id_node, id_cluster, id_cluster_selected),
+    df_cluster_ids    = df_nodes %>% select(id, id_cluster, is_cluster_visible),
     nw_cluster        = list(df_nodes = df_nodes, df_edges = df_edges)
   )
   

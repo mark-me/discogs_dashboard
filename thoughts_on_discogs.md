@@ -50,8 +50,9 @@ Is representative authorative? Artists having been involved of the most releases
 # 2021-09-03
 
 * If a cluster contains only one artist, turn the node into an artist node (give the cluster node only artist attributes)
-* If a cluster contains only releases and is connected to one other cluster, merge it into that cluster
-* If a cluster contains only releases and is connected to multiple nodes, put copies of it's nodes in both clusters and remove the node and create links between the adjoining nodes
+* If a cluster contains only releases 
+    * and is connected to one other cluster, merge it into that cluster
+    * and is connected to multiple nodes, put copies of it's nodes in both clusters and remove the node and create links between the adjoining nodes
 
 Display of releases
 * Per cluster order by most interconnecting releases within most authoritative performers

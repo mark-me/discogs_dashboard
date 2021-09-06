@@ -27,7 +27,7 @@ get_performer_master_network <- function(file_db){
   
   # Get master release nodes and edges
   db_conn <- dbConnect(RSQLite::SQLite(), file_db)
-  df_master_nodes <- dbReadTable(db_conn, 'nodes_master')
+  df_master_nodes <- dbReadTable(db_conn, 'nodes_master') %>% rename(type_node = type_release)
   df_master_edges <- dbReadTable(db_conn, 'edges_master')
   dbDisconnect(db_conn)
   
@@ -82,7 +82,7 @@ get_performer_network <- function(file_db){
     ungroup()
   
   df_nodes %<>%
-    left_join(df_qty_connections, by = "id_node")
+    left_join(df_qty_connections, by = "id_node") 
   
   # Combine into network list data frames
   lst_network <- list(

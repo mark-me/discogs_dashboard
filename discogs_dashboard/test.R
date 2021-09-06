@@ -1,3 +1,21 @@
+library(tidyverse)
+library(magrittr)
+library(RSQLite)
+library(yaml)
+library(scales)
+library(ggimage)
+library(visNetwork)
+source("discogs_dashboard/get_network_data_functions.R")
+source("discogs_dashboard/cluster_navigation.R")
+
+config <- read_yaml("config.yml")
+file_db <- paste0(config$db_location, "/discogs.sqlite")
+
+lst_network <- list(
+  res_clustering = read_rds(config$file_cluster_results),
+  nw_performer_releases = get_performer_master_network(file_db)
+)
+
 lst_search_results <- list()
 
 i <- 1
@@ -48,19 +66,27 @@ df_nodes %<>%
 graph_performer_releases <- graph_from_data_frame(d = df_edges, vertices = df_nodes, directed = FALSE)
 graph_clusters <- graph_performer_releases
 
-# Aggregate release network to the clusters 
-#df_agg_node_attr <- aggregate_node_attributes(graph_clusters, qty_authoritative = 3)
-
-# aggregate_node_attributes ----
-
-
-
-
-# Resume function ----
+df_agg_node_attr <- aggregate_node_attributes(graph_clusters, qty_authoritative = 3)
 V(graph_clusters)[df_agg_node_attr$name]$name_performer <- df_agg_node_attr$name_performer_clust
-V(graph_clusters)[df_agg_node_attr$name]$qty_nodes      <- df_agg_node_attr$qty_nodes_clust
-V(graph_clusters)[df_agg_node_attr$name]$qty_collection <- df_agg_node_attr$qty_collection_clust
-V(graph_clusters)[df_agg_node_attr$name]$qty_releases   <- df_agg_node_attr$qty_releases_clust
+V(graph_clusters)[df_agg_node_attr$name]$qty_nodes      <- df_agg_node_attr$qty_nodes
+V(graph_clusters)[df_agg_node_attr$name]$qty_edges      <- df_agg_node_attr$qty_edges
+V(graph_clusters)[df_agg_node_attr$name]$qty_collection <- df_agg_node_attr$qty_collection
+V(graph_clusters)[df_agg_node_attr$name]$qty_releases   <- df_agg_node_attr$qty_releases
+V(graph_clusters)[df_agg_node_attr$name]$qty_performers <- df_agg_node_attr$qty_performers
+
+# If a cluster contains only releases ----
+has_only_releases <- V(graph_clusters)$qty_nodes == V(graph_clusters)$qty_releases
+
+# and is connected to one other cluster, merge it into that cluster
+has_multiple_connections <- V(graph_clusters)$qty_edges > 1
+
+# and is connected to multiple nodes, put copies of it's nodes in both clusters and remove the node and create links between the adjoining nodes
+
+
+
+
+
+vertex_attr_names(graph_clusters)
 
 
 
