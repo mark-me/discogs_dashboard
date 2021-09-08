@@ -160,6 +160,7 @@ lst_search_result <- list(
   df_cluster_ids    = df_nodes %>% select(id, id_cluster, is_cluster_visible),
   nw_cluster        = list(df_nodes = df_nodes, df_edges = df_edges)
 )
+# End new ----
 
 lst_search_results[[i]] <- get_clustered_network(lst_network, lst_search_results, id_cluster_selected = 3)
 lst_search_results[[i]]$nw_cluster$df_nodes %<>% 
