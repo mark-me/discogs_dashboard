@@ -25,7 +25,7 @@ create_performer_nodes <- function(file_db){
     left_join(df_collection_result, by = "id_artist") %>% 
     select(id_node = id_artist, name_node = name_artist, everything()) %>% 
     mutate(type_performer = "artist",
-           id = id_node,
+           id_original = id_node,
            id_node = paste0("p_", id_node))
   
   # Members
@@ -33,7 +33,7 @@ create_performer_nodes <- function(file_db){
     select(-id_artist, -api_member) %>% 
     select(id_node = id_member, name_node = name_member, everything()) %>% 
     mutate(type_performer = "member",
-           id = id_node,
+           id_original = id_node,
            id_node = paste0("p_", id_node))
   
   # Groups
@@ -41,7 +41,7 @@ create_performer_nodes <- function(file_db){
     select(-id_artist, -api_group) %>% 
     select(id_node = id_group, name_node = name_group, everything()) %>% 
     mutate(type_performer = "member",
-           id = id_node,
+           id_original = id_node,
            id_node = paste0("p_", id_node))
   
   # Aliases
@@ -49,7 +49,7 @@ create_performer_nodes <- function(file_db){
     select(-id_artist, -api_alias) %>% 
     select(id_node = id_alias, name_node = name_alias, everything()) %>% 
     mutate(type_performer = "alias",
-           id = id_node,
+           id_original = id_node,
            id_node = paste0("p_", id_node))
   
   # Combine all nodes
@@ -57,7 +57,7 @@ create_performer_nodes <- function(file_db){
   
   df_nodes %<>%
     mutate(is_active = ifelse(is.na(is_active), TRUE, is_active)) %>% 
-    group_by(id_node, id, name_node) %>% 
+    group_by(id_node, id_original, name_node) %>% 
     summarise(across(name_artist_real:url_thumbnail, ~ first(.x, order_by = .x)),
               qty_collection_items = sum(qty_collection_items, na.rm = TRUE),
               type_performer = min(type_performer, na.rm = TRUE),
@@ -172,7 +172,7 @@ create_collection_item_nodes <- function(file_db){
     select(-id_instance, -starts_with("api_"), -starts_with("qty_")) %>% 
     select(id_node = id_release, name_node = title, url_image = url_cover, everything()) %>% 
     mutate(type_release = "collection_item",
-           id = id_node,
+           id_original = id_node,
            id_node = paste0("r_", id_node))
   
   dbWriteTable(db, name_table, df_result, overwrite = has_table) 
@@ -230,7 +230,7 @@ create_master_nodes <- function(file_db){
     ungroup() %>% 
     mutate(year = ifelse(year == 9999, NA, year),
            type_release = "release",
-           id = id_node,
+           id_original = id_node,
            id_node = paste0("r_", id_node))
   
   dbWriteTable(db, name_table, df_result, overwrite = has_table) 
