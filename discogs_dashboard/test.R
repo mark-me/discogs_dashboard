@@ -21,18 +21,32 @@ lst_search_results <- list()
 i <- 1
 lst_search_results[[i]] <- get_clustered_network(lst_network, lst_search_results = NA, id_cluster_selected = NA)
 lst_search_results[[i]]$nw_cluster$df_nodes %<>% 
-  mutate(label = paste0(id_cluster, "-", name_performer))
+  mutate(label = paste0(id_cluster, "-", name_authoritative))
 plot_network(lst_search_results[[i]]$nw_cluster)
 
 i <- 2
 id_cluster_selected <- 3
 lst_search_results[[i]] <- get_clustered_network(lst_network, lst_search_results, id_cluster_selected = 3)
 lst_search_results[[i]]$nw_cluster$df_nodes %<>% 
-  mutate(label = paste0(id_cluster, "-", name_performer))
+  mutate(label = paste0(id_cluster, "-", name_authoritative))
 plot_network(lst_search_results[[i]]$nw_cluster)
 
 i <- 3
 lst_search_results[[i]] <- get_clustered_network(lst_network, lst_search_results, id_cluster_selected = 127)
 lst_search_results[[i]]$nw_cluster$df_nodes %<>% 
-  mutate(label = paste0(id_cluster, "-", name_performer))
+  mutate(label = paste0(id_cluster, "-", name_authoritative))
+plot_network(lst_search_results[[i]]$nw_cluster)  
+
+
+i <- 4
+lst_search_results[[i]] <- get_clustered_network(lst_network, lst_search_results, id_cluster_selected = 771)
+lst_search_results[[i]]$nw_cluster$df_nodes %<>% 
+  mutate(label = paste0(id_cluster, "-", name_authoritative))
+plot_network(lst_search_results[[i]]$nw_cluster)  
+
+
+i <- 5
+lst_search_results[[i]] <- get_clustered_network(lst_network, lst_search_results, id_cluster_selected = 2312)
+lst_search_results[[i]]$nw_cluster$df_nodes %<>% 
+  mutate(label = paste0(id_cluster, "-", name_authoritative))
 plot_network(lst_search_results[[i]]$nw_cluster)  

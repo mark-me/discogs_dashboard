@@ -54,28 +54,29 @@ ui <- fluidPage(
 server <- function(input, output) {
 
     config <- read_yaml("config.yml")
-    
+    file_db <- paste0(config$db_location, "/discogs.sqlite")
+    file_cluster_result <- paste0(config$db_location, "/", config$file_cluster_result)
+
     # Getting the whole graph and load clustering result
-    graph_releases <- get_artist_clusters(file_db = paste0(config$db_location, "/discogs.sqlite"), 
-                                          file_cluster_result = config$file_cluster_results,
-                                          do_cluster_calculation = FALSE)
-    clust_releases <- read_rds(config$file_cluster_results)
+    lst_network <- list(
+        res_clustering = read_rds(file_cluster_result),
+        nw_performer_releases = get_performer_master_network(file_db)
+    )
     
     # Get highest clustering
-    lst_search_item <- list()
-    iter_graph      <- 1
-    lst_search_item[[iter_graph]] <- list()
-    lst_search_item[[iter_graph]] <- get_cluster(graph_rel   = graph_releases,
-                                                 res_clust   = clust_releases, 
-                                                 search_item = lst_search_item[[iter_graph]])
+    lst_search_results <- list()
+    iter_graph <- 1
+    lst_search_results[[iter_graph]] <- get_clustered_network(lst_network, lst_search_results = NA, id_cluster_selected = NA)
     
 
     output$network_artist_clusters <- renderVisNetwork({
         
-        nw_cluster <- cluster_to_network(lst_search_item[[iter_graph]]$graph)
+        nw_cluster <- lst_search_results[[iter_graph]]$nw_cluster
+        nw_cluster$df_nodes %<>% 
+            mutate(label = paste0(id_cluster, "-", name_authoritative))
         
         plot_network(nw_cluster) %>%
-            visLayout(improvedLayout = TRUE) #>% 
+            visLayout(improvedLayout = TRUE) %>% 
             visEvents(#click = "function(nodes) { Shiny.onInputChange('artist_id_node', nodes.nodes); ;}",
                       doubleClick = "function(nodes) { Shiny.onInputChange('cluster_id_node', nodes.nodes); ;}")
     })
@@ -85,12 +86,10 @@ server <- function(input, output) {
             
             print(input$cluster_id_node)
             iter_graph <<- iter_graph + 1
-            lst_search_item[[iter_graph]] <<- list(id_cluster_selected = input$cluster_id_node)
-            lst_search_item[[iter_graph]] <<- get_cluster(graph_rel   = graph_releases,
-                                                          res_clust   = clust_releases, 
-                                                          search_item = lst_search_item[[iter_graph]],
-                                                          search_item_previous = lst_search_item[[iter_graph-1]])
-            
+            lst_search_results[[iter_graph]] <<- get_clustered_network(lst_network, 
+                                                                       lst_search_results, 
+                                                                       id_cluster_selected = cluster_id_node)
+
             visNetworkProxy("network_artist_clusters") #%>%
                 # visRemoveNodes(nw_removed$df_nodes$id) %>% 
                 # visRemoveEdges(nw_removed$df_edges$id) %>% 
