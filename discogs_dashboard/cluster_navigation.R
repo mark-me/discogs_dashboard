@@ -37,111 +37,175 @@ get_clusters <- function(res_clustering, id_step = NA, id_cluster_selected = NA)
   return(lst_search)
 }
 
-aggregate_node_attributes <- function(graph_clusters, qty_authoritative){
+move_single_connecting_releases_to_cluster <- function(nw){
+  
+  df_non_clustered <- nw$df_nodes %>% 
+    filter(is.na(id_cluster) | is.na(is_cluster_visible)) %>% 
+    select(-id_cluster, -is_cluster_visible) %>% 
+    inner_join(select(nw$df_edges, id_node = to, id_artist = from), 
+               by = "id_node") %>% 
+    inner_join(select(nw$df_nodes, id_artist = id_node, id_cluster, is_cluster_visible),
+               by = "id_artist") %>% 
+    select(id_node, id_cluster_derived = id_cluster, is_visible_derived = is_cluster_visible)
+  
+  nw$df_nodes %<>%
+    left_join(df_non_clustered, by = "id_node") %>% 
+    mutate(id_cluster         = ifelse(is.na(id_cluster), id_cluster_derived, id_cluster),
+           is_cluster_visible = ifelse(is.na(is_cluster_visible), is_visible_derived, is_cluster_visible)) %>% 
+    select(-id_cluster_derived, -is_visible_derived)
+  
+  rm(df_non_clustered)
+  
+  return(nw)
+}
 
-  # Find most authoritative performers based on number of connections
-  qty_node_edges <- degree(graph_clusters)
-  V(graph_clusters)$qty_edges <- qty_node_edges
-    
-  df_nodes <- as_data_frame(graph_clusters, what = "vertices")
+# If a cluster contains only releases that connect other clusters duplicate the nodes across clusters
+copy_multiple_connecting_releases_to_clusters <- function(nw){
+  
+  # Find nodes of the clusters that only contain releases
+  df_nodes_release_clusters <- nw$df_nodes %>% 
+    group_by(id_cluster) %>% 
+    mutate(qty_cluster_nodes    = n(),
+           qty_cluster_releases = sum(type_node == "release")) %>% 
+    ungroup() %>% 
+    filter(qty_cluster_nodes == qty_cluster_releases) %>% 
+    filter(qty_edges > 1)
+  
+  # Find associated edges
+  df_edges_release_clusters <- nw$df_edges %>% filter(to %in% df_nodes_release_clusters$id_node)
+  
+  # Make copies of the edges
+  df_edge_copies <- nw$df_nodes %>%
+    select(id_node, id_cluster) %>% 
+    inner_join(df_edges_release_clusters, by = c("id_node" = "from")) %>% 
+    rename(from = id_node) %>% 
+    unique()
+  
+  # Make copies of the nodes and provide them with unique ID's
+  df_nodes_copies <- df_nodes_release_clusters %>% 
+    select(-id_cluster) %>% 
+    inner_join(select(df_edge_copies, to, id_cluster) %>% unique(),
+               by = c("id_node" = "to")) %>% 
+    mutate(id_node = paste0(id_node, "_", id_cluster))
+  
+  # Adjust edge copies with new node ID's
+  df_edge_copies %<>%
+    mutate(to = paste0(to, "_", id_cluster)) %>% 
+    select(-id_cluster)
+  
+  # Rebuild network
+  nw$df_nodes %<>% anti_join(df_nodes_release_clusters, by = "id_node")       # Remove old nodes 
+  nw$df_nodes <- bind_rows(nw$df_nodes, df_nodes_copies)                         # Add copies of nodes
+  nw$df_edges %<>% anti_join(df_edges_release_clusters, by = c("from", "to")) # Remove old edges
+  nw$df_edges <- bind_rows(nw$df_edges, df_edge_copies)                          # Add copies of edges
+  
+  rm(df_nodes_release_clusters, df_nodes_copies, df_edges_release_clusters, df_edge_copies)  
+  
+  return(nw)
+}
 
-  # Find _qty_authoritative_ most authoritative performers
-  df_authoritative <- df_nodes %>% 
+# Add count of edges per node
+add_edge_count <- function(nw){
+  
+  graph_performer_releases <- graph_from_data_frame(d = nw$df_edges, vertices = nw$df_nodes, directed = FALSE)
+  df_qty_edges <- tibble(
+    id_node   = V(graph_performer_releases)$name,
+    qty_edges = degree(graph_performer_releases)
+  )
+  rm(graph_performer_releases)
+  nw$df_nodes %<>%  left_join(df_qty_edges, by = "id_node")
+  
+  return(nw)
+}
+
+# Add _qty_authoritative_ most authoritative performers as a cluster description
+add_most_authoritative_names <- function(nw, qty_authoritative = 3){
+  
+  df_authoritative <- nw$df_nodes %>% 
     arrange(desc(qty_edges)) %>% 
     group_by(id_cluster) %>% 
     mutate(idx_row_qty_edges = ifelse(type_node == "performer", row_number(), NA)) %>% 
     ungroup() %>% 
     mutate(name_performer = ifelse(idx_row_qty_edges <= qty_authoritative, name_node, NA)) %>% 
     group_by(id_cluster) %>% 
-    mutate(name_performer_clust = paste(na.omit(name_performer), collapse = "\n")) %>% 
+    mutate(name_authoritative = paste(na.omit(name_performer), collapse = "\n")) %>% 
     ungroup() %>%
-    select(name, name_performer_clust)
+    select(id_node, name_authoritative)
   
-  df_nodes %<>%
-    left_join(df_authoritative, by = "name") %>% 
+  nw$df_nodes %<>% left_join(df_authoritative, by = "id_node")
+  
+  rm(df_authoritative)
+  
+  return(nw)  
+}
+
+# Add cluster statistics
+add_cluster_statistics <- function(nw){
+  
+  nw$df_nodes %<>%
     group_by(id_cluster) %>% 
     mutate(qty_nodes      = n(),
            qty_collection = sum(qty_collection_items, na.rm = TRUE),
            qty_releases   = sum(type_node == "release"),
            qty_performers = sum(type_node == "performer")) %>% 
-    ungroup() %>% 
-    select(name, id_cluster, name_performer_clust, qty_edges, qty_nodes, qty_collection, qty_releases, qty_performers)
+    ungroup() 
   
-  return(df_nodes)
+  return(nw)
 }
 
-aggregate_network <- function(graph_clusters){
+aggregate_network <- function(nw){
   
-  # Aggregate release network to the clusters 
-  df_agg_node_attr <- aggregate_node_attributes(graph_clusters, qty_authoritative = 3)
-  V(graph_clusters)[df_agg_node_attr$name]$name_performer <- df_agg_node_attr$name_performer_clust
-  V(graph_clusters)[df_agg_node_attr$name]$qty_nodes      <- df_agg_node_attr$qty_nodes
-  V(graph_clusters)[df_agg_node_attr$name]$qty_edges      <- df_agg_node_attr$qty_edges
-  V(graph_clusters)[df_agg_node_attr$name]$qty_collection <- df_agg_node_attr$qty_collection
-  V(graph_clusters)[df_agg_node_attr$name]$qty_releases   <- df_agg_node_attr$qty_releases
-  V(graph_clusters)[df_agg_node_attr$name]$qty_performers <- df_agg_node_attr$qty_performers
+  graph_network <- graph_from_data_frame(d = nw$df_edges, vertices = nw$df_nodes, directed = FALSE)
   
   # Create a aggregated graph
-  graph_contracted <- contract(graph_clusters, V(graph_clusters)$id_cluster, vertex.attr.comb = list("first"))
+  graph_contracted <- contract(graph_network, V(graph_network)$id_cluster, vertex.attr.comb = list("first"))
   graph_contracted <- simplify(graph_contracted)
   graph_contracted <- delete_vertices(graph_contracted, 
                                       V(graph_contracted)[!V(graph_contracted)$is_cluster_visible])
   
-  return(graph_contracted)
+  nw_contracted <- list(
+    df_nodes = as_data_frame(graph_contracted, what = "vertices") %>% rename(id = name), 
+    df_edges = as_data_frame(graph_contracted, what = "edges")
+    )
+  return(nw_contracted)
 }
 
 get_clustered_network <- function(lst_network, lst_search_results = NA, id_cluster_selected = NA){
   
-  # Get least number of clusters if no previous search results are provided
+  nw <- lst_network$nw_performer_releases
+  
+  
   if(is.na(lst_search_results)){
+    # Get least number of clusters if no previous search results are provided
     lst_search_result <- get_clusters(lst_network$res_clustering)  
   } else {
+    # Get clustering based on the previous aggregation level and a chosen node within that aggregation
     lst_search_result <- get_clusters(res_clustering = lst_network$res_clustering,
                                       id_step = lst_search_results[[length(lst_search_results)]]$id_step, 
                                       id_cluster_selected = id_cluster_selected) 
   }
   
-  df_clusters <- tibble(
-    id_node            = lst_search_result$df_cluster$id_nodes,
-    id_cluster         = lst_search_result$df_cluster$id_cluster,
-    is_cluster_visible = lst_search_result$df_cluster$is_visible
-  )
+  # Add cluster id's to the nodes
+  df_clusters <- tibble(id_node            = lst_search_result$df_cluster$id_nodes,
+                        id_cluster         = lst_search_result$df_cluster$id_cluster,
+                        is_cluster_visible = lst_search_result$df_cluster$is_visible )
+  nw$df_nodes %<>% left_join(df_clusters, by = "id_node") # Add cluster ID's to nodes
   
-  # Add cluster ID's to nodes
-  df_nodes <- lst_network$nw_performer_releases$df_nodes
-  df_edges <- lst_network$nw_performer_releases$df_edges
-  df_nodes %<>%
-    left_join(df_clusters, by = "id_node")
+  # Set single connecting releases cluster to the performer's cluster ID 
+  nw <-move_single_connecting_releases_to_cluster(nw)
+  nw <- add_edge_count(nw)  # Add count of edges per node
+  # If a cluster contains only releases that connect other clusters duplicate the nodes across clusters
+  nw <- copy_multiple_connecting_releases_to_clusters(nw)
+  nw <- add_most_authoritative_names(nw, qty_authoritative = 3) # Add _qty_authoritative_ most authoritative performers as a cluster description
+  nw <- add_cluster_statistics(nw)         # Add cluster statistics
+  nw_contracted <- aggregate_network(nw)   # Contract network to clusters
   
-  # Non-connecting release nodes won't have a cluster ID. They will get the performer's cluster ID 
-  df_non_clustered <- df_nodes %>% 
-    filter(is.na(id_cluster) | is.na(is_cluster_visible)) %>% 
-    select(-id_cluster, -is_cluster_visible) %>% 
-    inner_join(select(df_edges, id_node = to, id_artist = from), 
-               by = "id_node") %>% 
-    inner_join(select(df_nodes, id_artist = id_node, id_cluster, is_cluster_visible),
-               by = "id_artist") %>% 
-    select(id_node, id_cluster_derived = id_cluster, is_visible_derived = is_cluster_visible)
-  
-  df_nodes %<>%
-    left_join(df_non_clustered, by = "id_node") %>% 
-    mutate(id_cluster         = ifelse(is.na(id_cluster), id_cluster_derived, id_cluster),
-           is_cluster_visible = ifelse(is.na(is_cluster_visible), is_visible_derived, is_cluster_visible)) %>% 
-    select(-id_cluster_derived, -is_visible_derived)
-  
-  # Contract network to clusters
-  graph_performer_releases <- graph_from_data_frame(d = df_edges, vertices = df_nodes, directed = FALSE)
-  graph_clusters <- aggregate_network(graph_performer_releases)
-  
-  df_nodes <- as_data_frame(graph_clusters, what = "vertices") %>% rename(id = name)
-  df_edges <- as_data_frame(graph_clusters, what = "edges")
-  
+  # Compile return object
   lst_search_result <- list(
     id_step_hierarchy = lst_search_result$id_step_hierarchy,
-    df_cluster_ids    = df_nodes %>% select(id, id_cluster, is_cluster_visible),
-    nw_cluster        = list(df_nodes = df_nodes, df_edges = df_edges)
+    df_cluster_ids    = nw$df_nodes %>% select(id_node, id_cluster, is_cluster_visible),
+    nw_cluster        = nw_contracted
   )
-  
   return(lst_search_result)
 }
 
