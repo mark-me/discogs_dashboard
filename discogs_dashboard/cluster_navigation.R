@@ -200,6 +200,21 @@ get_clustered_network <- function(lst_network, lst_search_results = NA, id_clust
   nw <- add_cluster_statistics(nw)         # Add cluster statistics
   nw_contracted <- aggregate_network(nw)   # Contract network to clusters
   
+  # Temp fix: replacing node id's with cluster id's
+  nw_contracted$df_edges %<>% 
+    left_join(select(nw_contracted$df_nodes, id, id_cluster),
+              by = c("from" = "id")) %>% 
+    mutate(from = id_cluster) %>% 
+    select(-id_cluster) %>% 
+    left_join(select(nw_contracted$df_nodes, id, id_cluster),
+              by = c("to" = "id")) %>% 
+    mutate(to = id_cluster) %>% 
+    select(-id_cluster) 
+  
+  nw_contracted$df_nodes %<>%
+    mutate(id = id_cluster) %>% 
+    mutate(label = paste0(id_cluster, "-", name_authoritative))
+  
   # Compile return object
   lst_search_result <- list(
     id_step_hierarchy = lst_search_result$id_step_hierarchy,
