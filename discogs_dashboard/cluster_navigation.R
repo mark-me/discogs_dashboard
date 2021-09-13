@@ -15,7 +15,7 @@ get_clusters <- function(res_clustering, id_step = NA, id_cluster_selected = NA)
     if(sum(is_visible) > 1){
       
       # Drill down the hierarchy until there are at least 6 clusters or the maximum number of nodes is reached
-      qty_clusters_min <- ifelse(sum(is_visible) < 6, sum(is_visible), 6)
+      qty_clusters_min <- ifelse(sum(is_visible) < 15, sum(is_visible), 15)
       qty_clusters <- 0
        while(qty_clusters < qty_clusters_min){
         
@@ -174,7 +174,6 @@ get_clustered_network <- function(lst_network, lst_search_results = NA, id_clust
   
   nw <- lst_network$nw_performer_releases
   
-  
   if(is.na(lst_search_results)){
     # Get least number of clusters if no previous search results are provided
     lst_search_result <- get_clusters(lst_network$res_clustering)  
@@ -213,7 +212,7 @@ get_clustered_network <- function(lst_network, lst_search_results = NA, id_clust
   
   nw_contracted$df_nodes %<>%
     mutate(id = id_cluster) %>% 
-    mutate(label = paste0(id_cluster, "-", name_authoritative))
+    mutate(label = name_authoritative)
   
   # Compile return object
   lst_search_result <- list(

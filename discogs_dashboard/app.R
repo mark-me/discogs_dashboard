@@ -36,11 +36,8 @@ ui <- fluidPage(
     # Sidebar with a slider input for number of bins 
     sidebarLayout(
         sidebarPanel(
-            sliderInput("bins",
-                        "Number of bins:",
-                        min = 1,
-                        max = 50,
-                        value = 30)
+            actionButton("btn_reset", "Reset"),
+            actionButton("btn_back", "Back")
         ),
 
         # Show a plot of the generated distribution
@@ -65,15 +62,15 @@ server <- function(input, output) {
     
     # Search values
     lst_searches <<- list()
-    # iter_graph <- 1
-    # input$id_cluster <- NA
     search <- reactiveValues(
         idx = 1,
         id_cluster = NA
     )
     
     # Get highest clustering level
-    lst_searches[[1]] <- get_clustered_network(lst_network, lst_search_results = NA, id_cluster_selected = NA)
+    lst_searches[[1]] <- get_clustered_network(lst_network, 
+                                               lst_search_results  = NA, 
+                                               id_cluster_selected = NA)
     nw_cluster <- lst_searches[[1]]$nw_cluster
 
     output$network_artist_clusters <- renderVisNetwork({
@@ -89,7 +86,7 @@ server <- function(input, output) {
         
        print(paste0("Iteration: ", idx, "/ id_cluster: ", id_cluster))
        lst_searches[[idx]] <<- get_clustered_network(lst_network,
-                                                     lst_search_results = lst_searches,
+                                                     lst_search_results  = ifelse(is.na(id_cluster), NA, lst_searches),
                                                      id_cluster_selected = id_cluster)
        nw_cluster <<- lst_searches[[idx]]$nw_cluster
     }
@@ -100,6 +97,12 @@ server <- function(input, output) {
             search$id_cluster <- input$id_cluster
             get_next_cluster(search$idx, search$id_cluster)
         }
+    })
+    
+    observeEvent(input$btn_reset,{
+        search$idx        <- 1
+        search$id_cluster <- NA
+        get_next_cluster(search$idx, search$id_cluster)
     })
  
  
