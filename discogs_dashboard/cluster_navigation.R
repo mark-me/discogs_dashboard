@@ -223,6 +223,7 @@ get_clustered_network <- function(lst_network, lst_search_results = NA, id_clust
   return(lst_search_result)
 }
 
+
 plot_network <- function(network){
   
   visNetwork(network$df_nodes, network$df_edges
@@ -239,18 +240,43 @@ plot_network <- function(network){
     visPhysics(maxVelocity = 10)
 }
 
-file_db <- '~/Development/Datasets/discogs_dashboard/discogs.sqlite'
-file_cluster_result <- 'cluster_edge_betweenness.rds'
+get_cluster_performers <- function(df_network_nodes, df_cluster_ids){
+  
+  df_performers <- df_network_nodes %>% 
+    filter(type_node == "performer") %>% 
+    inner_join(df_cluster_ids, by = "id_node") %>% 
+    filter(is_cluster_visible) %>% 
+    select(-year, -in_collection, -is_cluster_visible)
+  
+  return(df_performers)
+}
 
-# Create an object containing the network and its clustering result
-lst_network <- list(
-  nw_performer_releases = get_performer_master_network(file_db),
-  res_clustering        = get_performer_clusters(nw_performer_releases, 
-                                                 file_cluster_result, 
-                                                 do_cluster_calculation = FALSE)
-)
+get_cluster_releases <- function(df_network_nodes, df_cluster_ids){
+  
+  df_releases <- df_network_nodes %>%   
+    filter(type_node == "release") %>% 
+    select(-starts_with("qty_"), -name_artist_real, -profile, -url_artist_discogs,
+           -api_releases, -url_image, -type_performer, -is_active, -role_primary, -has_release) %>% 
+    inner_join(df_cluster_ids, by = "id_node") %>% 
+    filter(is_cluster_visible) %>% 
+    select(-is_cluster_visible)
+    
+  return(df_releases)
+}
+
 
 example_cluster_navigation <- function(){
+ 
+  file_db <- '~/Development/Datasets/discogs_dashboard/discogs.sqlite'
+  file_cluster_result <- 'cluster_edge_betweenness.rds'
+  
+  # Create an object containing the network and its clustering result
+  lst_network <- list(
+    nw_performer_releases = get_performer_master_network(file_db),
+    res_clustering        = get_performer_clusters(nw_performer_releases, 
+                                                   file_cluster_result, 
+                                                   do_cluster_calculation = FALSE)
+  )
   
   # A list that will contain search results
   lst_search_results <- list()

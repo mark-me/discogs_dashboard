@@ -72,7 +72,11 @@ server <- function(input, output) {
                                                lst_search_results  = NA, 
                                                id_cluster_selected = NA)
     nw_cluster <- lst_searches[[1]]$nw_cluster
-
+    df_performers <- get_cluster_performers(df_network_nodes = lst_network$nw_performer_releases$df_nodes,
+                                            df_cluster_ids   = lst_searches[[1]]$df_cluster_ids)
+    df_releases   <- get_cluster_releases(df_network_nodes = lst_network$nw_performer_releases$df_nodes,
+                                          df_cluster_ids   = lst_searches[[1]]$df_cluster_ids)
+    
     output$network_artist_clusters <- renderVisNetwork({
         
         search$id_cluster
@@ -89,6 +93,11 @@ server <- function(input, output) {
                                                      lst_search_results  = ifelse(is.na(id_cluster), NA, lst_searches),
                                                      id_cluster_selected = id_cluster)
        nw_cluster <<- lst_searches[[idx]]$nw_cluster
+       
+       df_performers <<- get_cluster_performers(df_network_nodes = lst_network$nw_performer_releases$df_nodes,
+                                                df_cluster_ids   = lst_searches[[idx]]$df_cluster_ids)
+       df_releases   <<- get_cluster_releases(df_network_nodes = lst_network$nw_performer_releases$df_nodes,
+                                              df_cluster_ids   = lst_searches[[idx]]$df_cluster_ids)
     }
     
     observeEvent(input$id_cluster,{
