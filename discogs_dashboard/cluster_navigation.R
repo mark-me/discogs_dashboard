@@ -15,14 +15,27 @@ get_clusters <- function(res_clustering, id_step = NA, id_cluster_selected = NA)
     # Only drill down if there is more than one node in the cluster
     if(sum(is_visible) > 1){
       
-      # Drill down the hierarchy until there are at least 15 clusters or the maximum number of nodes is reached
-      qty_clusters_min <- ifelse(sum(is_visible) < 15, sum(is_visible), 15)
+      # Drill down the hierarchy until there are at least 10 and and max 15 clusters of nodes is reached
+      qty_clusters_min <- ifelse(sum(is_visible) < 12, sum(is_visible), 12)
+      qty_clusters_max <- ifelse(sum(is_visible) < 15, sum(is_visible), 15)
       qty_clusters <- 0
-       while(qty_clusters < qty_clusters_min){
+      stop <- FALSE
+      step_size <- -1000 # Initial step size through the hierarchy to speed search up
+      while(!stop){
         
-        id_step      <- id_step - 100  # Taking the number of steps by 100 to speed up the search process
+        id_step      <- id_step + step_size  # Taking the number of steps by 100 to speed up the search process
         id_cluster   <- cut_at(res_clustering, steps = id_step)
         qty_clusters <- length(unique(id_cluster[is_visible]))
+        
+        # Correct if step size overshoots the number of nodes
+        if(qty_clusters > qty_clusters_max){
+          step_size <- abs(round(step_size/2))
+        } else if(qty_clusters < qty_clusters_min){
+          step_size <- -1 * abs(round(step_size/2))
+        } else {
+          stop <- TRUE
+        }
+        
       }      
     } else {
       id_cluster   <- cut_at(res_clustering, steps = id_step)
@@ -244,13 +257,15 @@ get_clustered_network <- function(lst_network, lst_search_results = NA, id_clust
   return(lst_search_result)
 }
 
-
+# Plot a performer cluster
 plot_network <- function(network){
   
   network$df_nodes %<>%
+    #mutate(size = log(qty_collection), icon.size = log(qty_collection)) %>% 
     mutate(image = ifelse(qty_performers == 1, url_thumbnail, NA),
            shape = ifelse(qty_performers == 1, "image", "icon"),
-           icon.code = "f0c0")
+           icon.code = "f0c0") %>% 
+    mutate(label = paste(id_cluster, "-", qty_performers,"-", label))
   
   visNetwork(network$df_nodes, network$df_edges
              , background = "black") %>% 
@@ -267,6 +282,7 @@ plot_network <- function(network){
     addFontAwesome()
 }
 
+# Get a data frome of the performers from the currently visible clusters
 get_cluster_performers <- function(df_network_nodes, df_cluster_ids){
   
   df_performers <- df_network_nodes %>% 
@@ -278,6 +294,7 @@ get_cluster_performers <- function(df_network_nodes, df_cluster_ids){
   return(df_performers)
 }
 
+# Get a data frome of releases from the currently visible clusters
 get_cluster_releases <- function(df_network_nodes, df_cluster_ids){
   
   df_releases <- df_network_nodes %>%   
