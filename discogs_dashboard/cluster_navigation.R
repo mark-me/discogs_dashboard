@@ -1,5 +1,6 @@
 library(igraph)
 
+# Get a clustering of performers at a specified point in the clustering hierarchy
 get_clusters <- function(res_clustering, id_step = NA, id_cluster_selected = NA){
   
   # If no step is given, the most aggregated level is shown
@@ -14,7 +15,7 @@ get_clusters <- function(res_clustering, id_step = NA, id_cluster_selected = NA)
     # Only drill down if there is more than one node in the cluster
     if(sum(is_visible) > 1){
       
-      # Drill down the hierarchy until there are at least 6 clusters or the maximum number of nodes is reached
+      # Drill down the hierarchy until there are at least 15 clusters or the maximum number of nodes is reached
       qty_clusters_min <- ifelse(sum(is_visible) < 15, sum(is_visible), 15)
       qty_clusters <- 0
        while(qty_clusters < qty_clusters_min){
@@ -37,6 +38,8 @@ get_clusters <- function(res_clustering, id_step = NA, id_cluster_selected = NA)
   return(lst_search)
 }
 
+
+# Move all releases that do not belong to a cluster to the performer's cluster
 move_single_connecting_releases_to_cluster <- function(nw){
   
   df_non_clustered <- nw$df_nodes %>% 
@@ -95,9 +98,9 @@ copy_multiple_connecting_releases_to_clusters <- function(nw){
   
   # Rebuild network
   nw$df_nodes %<>% anti_join(df_nodes_release_clusters, by = "id_node")       # Remove old nodes 
-  nw$df_nodes <- bind_rows(nw$df_nodes, df_nodes_copies)                         # Add copies of nodes
+  nw$df_nodes <- bind_rows(nw$df_nodes, df_nodes_copies)                      # Add copies of nodes
   nw$df_edges %<>% anti_join(df_edges_release_clusters, by = c("from", "to")) # Remove old edges
-  nw$df_edges <- bind_rows(nw$df_edges, df_edge_copies)                          # Add copies of edges
+  nw$df_edges <- bind_rows(nw$df_edges, df_edge_copies)                       # Add copies of edges
   
   rm(df_nodes_release_clusters, df_nodes_copies, df_edges_release_clusters, df_edge_copies)  
   
@@ -122,7 +125,7 @@ add_edge_count <- function(nw){
 add_most_authoritative_names <- function(nw, qty_authoritative = 3){
   
   df_authoritative <- nw$df_nodes %>% 
-    arrange(desc(qty_edges)) %>% 
+    arrange(desc(qty_collection_items),desc(qty_edges)) %>% 
     group_by(id_cluster) %>% 
     mutate(idx_row_qty_edges = ifelse(type_node == "performer", row_number(), NA)) %>% 
     ungroup() %>% 
@@ -139,6 +142,22 @@ add_most_authoritative_names <- function(nw, qty_authoritative = 3){
   return(nw)  
 }
 
+# Only add performer images
+add_performer_image <- function(nw){
+  
+  df_images <- nw$df_nodes %>%
+    filter(type_node == "performer") %>% 
+    group_by(id_cluster) %>% 
+    summarise(url_thumbnail_performer = first(url_thumbnail)) %>% 
+    ungroup() 
+  
+  nw$df_nodes %<>%
+    left_join(df_images, by = "id_cluster") %>% 
+    mutate(url_thumbnail = url_thumbnail_performer) %>% 
+    select(-url_thumbnail_performer)
+  
+  return(nw)
+}
 # Add cluster statistics
 add_cluster_statistics <- function(nw){
   
@@ -170,6 +189,7 @@ aggregate_network <- function(nw){
   return(nw_contracted)
 }
 
+# Get a clustering of performers at a specified point in the clustering hierarchy, returning an aggregated network
 get_clustered_network <- function(lst_network, lst_search_results = NA, id_cluster_selected = NA){
   
   nw <- lst_network$nw_performer_releases
@@ -195,6 +215,7 @@ get_clustered_network <- function(lst_network, lst_search_results = NA, id_clust
   nw <- add_edge_count(nw)  # Add count of edges per node
   # If a cluster contains only releases that connect other clusters duplicate the nodes across clusters
   nw <- copy_multiple_connecting_releases_to_clusters(nw)
+  nw <- add_performer_image(nw)
   nw <- add_most_authoritative_names(nw, qty_authoritative = 3) # Add _qty_authoritative_ most authoritative performers as a cluster description
   nw <- add_cluster_statistics(nw)         # Add cluster statistics
   nw_contracted <- aggregate_network(nw)   # Contract network to clusters
@@ -226,6 +247,11 @@ get_clustered_network <- function(lst_network, lst_search_results = NA, id_clust
 
 plot_network <- function(network){
   
+  network$df_nodes %<>%
+    mutate(image = ifelse(qty_performers == 1, url_thumbnail, NA),
+           shape = ifelse(qty_performers == 1, "image", "icon"),
+           icon.code = "f0c0")
+  
   visNetwork(network$df_nodes, network$df_edges
              , background = "black") %>% 
     visNodes(
@@ -237,7 +263,8 @@ plot_network <- function(network){
                   strokeColor = alpha("black", alpha = 0.7)),
       shadow = list(enabled = TRUE, size = 10))  %>%
     visOptions(highlightNearest = TRUE) %>%
-    visPhysics(maxVelocity = 10)
+    visPhysics(maxVelocity = 10) %>%
+    addFontAwesome()
 }
 
 get_cluster_performers <- function(df_network_nodes, df_cluster_ids){
