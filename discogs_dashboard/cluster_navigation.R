@@ -11,6 +11,7 @@ get_clusters <- function(res_clustering, id_step = NA, id_cluster_selected = NA)
   } else {
     # Set the nodes to visible that fall in the selected cluster
     is_visible <- cut_at(res_clustering, steps = id_step) == id_cluster_selected
+    print(paste("Nodes in cluster: ", sum(is_visible)))
     
     # Only drill down if there is more than one node in the cluster
     if(sum(is_visible) > 1){
@@ -20,22 +21,24 @@ get_clusters <- function(res_clustering, id_step = NA, id_cluster_selected = NA)
       qty_clusters_max <- ifelse(sum(is_visible) < 15, sum(is_visible), 15)
       qty_clusters <- 0
       stop <- FALSE
-      step_size <- -1000 # Initial step size through the hierarchy to speed search up
+      step_size <- -1000    # Initial step size through the hierarchy to speed search up
+      hit_ceiling <- FALSE  # Indicates overshooting optimum cluster size
       while(!stop){
         
         id_step      <- id_step + step_size  # Taking the number of steps by 100 to speed up the search process
         id_cluster   <- cut_at(res_clustering, steps = id_step)
         qty_clusters <- length(unique(id_cluster[is_visible]))
         
+        print(paste0(id_step, "/ step_size: ", step_size, "/ qty_clusters: ", qty_clusters))        
         # Correct if step size overshoots the number of nodes
         if(qty_clusters > qty_clusters_max){
           step_size <- abs(round(step_size/2))
-        } else if(qty_clusters < qty_clusters_min){
+          hit_ceiling <- TRUE
+        } else if(hit_ceiling & qty_clusters < qty_clusters_min){
           step_size <- -1 * abs(round(step_size/2))
         } else {
           stop <- TRUE
         }
-        
       }      
     } else {
       id_cluster   <- cut_at(res_clustering, steps = id_step)
@@ -44,9 +47,9 @@ get_clusters <- function(res_clustering, id_step = NA, id_cluster_selected = NA)
   
   lst_search <- list(
     id_step_hierarchy = id_step,
-    df_cluster = tibble(id_nodes   = res_clustering$names,
+    df_cluster = tibble(id_node = res_clustering$names,
                         id_cluster = id_cluster,
-                        is_visible = is_visible)
+                        is_cluster_visible = is_visible)
   )
   return(lst_search)
 }
@@ -218,10 +221,7 @@ get_clustered_network <- function(lst_network, lst_search_results = NA, id_clust
   }
   
   # Add cluster id's to the nodes
-  df_clusters <- tibble(id_node            = lst_search_result$df_cluster$id_nodes,
-                        id_cluster         = lst_search_result$df_cluster$id_cluster,
-                        is_cluster_visible = lst_search_result$df_cluster$is_visible )
-  nw$df_nodes %<>% left_join(df_clusters, by = "id_node") # Add cluster ID's to nodes
+  nw$df_nodes %<>% left_join(lst_search_result$df_cluster, by = "id_node") # Add cluster ID's to nodes
   
   # Set single connecting releases cluster to the performer's cluster ID 
   nw <-move_single_connecting_releases_to_cluster(nw)
