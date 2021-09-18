@@ -257,6 +257,70 @@ get_clustered_network <- function(lst_network, lst_search_results = NA, id_clust
   return(lst_search_result)
 }
 
+# Search for a performer and it's network consisting of about 10 performers
+search_performer_network <- function(lst_network, name_performer){
+  
+  # Uncomplicate data referencing
+  res_clustering <- lst_network$res_clustering
+  nw <- lst_network$nw_performer_releases
+  
+  # Make graph of network  
+  graph_network <- graph_from_data_frame(d = nw$df_edges, vertices = nw$df_nodes, directed = FALSE)
+  is_node_perfomer <- V(graph_network)$name_node == name_performer & V(graph_network)$type_node == "performer"
+  id_node_perfomer <- V(graph_network)[is_node_perfomer]$name
+  
+  # Drill down the hierarchy until there is closest to _qty_in_cluster_optimum_ performers in a cluster
+  qty_in_cluster_optimum <- 10
+  qty_in_cluster <- 0       # Number of performers in a cluster
+  id_step <- 1
+  stop <- FALSE
+  step_size <- 5000          # Initial step size through the hierarchy to speed search up
+  distance_optimum <- -99999 # Distance to _qty_in_cluster_optimum_
+  crossed_zero <- FALSE      # Indicates overshooting optimum cluster size
+  while(!stop){
+    
+    # Assign clustering to nodes
+    id_cluster <- cut_at(res_clustering, steps = id_step)
+    V(graph_network)[res_clustering$names]$id_cluster <- id_cluster       
+    id_cluster_performer <- V(graph_network)[id_node_perfomer]$id_cluster # Get performer's cluster id
+    
+    # Find the number of performers in the same cluster as the searched performer
+    is_perfomers         <- V(graph_network)$type_node == "performer"
+    in_performer_cluster <- V(graph_network)$id_cluster == id_cluster_performer
+    qty_in_cluster       <- length(V(graph_network)[is_perfomers & in_performer_cluster])
+    
+    # If the distance to the optimum switches from positive to negative or reverse ....
+    crossed_zero     <- (distance_optimum * (qty_in_cluster - qty_in_cluster_optimum)) < 0
+    distance_optimum <- qty_in_cluster - qty_in_cluster_optimum
+    
+    prev_step_size <- step_size
+    # take smaller steps
+    if(distance_optimum > 0 & crossed_zero){
+      step_size <- -1 * abs(round(step_size/2))
+      step_size <- ifelse(step_size == 0, -1, step_size)
+    } else if(distance_optimum < 0 & crossed_zero){
+      step_size <- abs(round(step_size/2))
+      step_size <- ifelse(step_size == 0, 1, step_size)
+    } 
+    
+    # Stop processing if process keeps swinging around a 0 distance from optimum (i.e. -1, +1)
+    if(step_size + prev_step_size == 0){
+      stop <- TRUE
+    }
+    
+    id_step <- id_step + step_size  # Taking the number of steps by 100 to speed up the search process
+  }    
+  
+  lst_search <- list(
+    id_step_hierarchy = id_step,
+    df_cluster = tibble(id_nodes   = res_clustering$names,
+                        id_cluster = id_cluster,
+                        is_visible = id_cluster == id_cluster_performer)
+  )
+  
+  return(lst_search)
+}
+
 # Plot a performer cluster
 plot_network <- function(network){
   

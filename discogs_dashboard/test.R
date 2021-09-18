@@ -28,7 +28,7 @@ df_releases   <- get_cluster_releases(df_network_nodes = lst_network$nw_performe
                                       df_cluster_ids   = lst_search_results[[i]]$df_cluster_ids)
 
 i <- 2
-lst_search_results[[i]] <- get_clustered_network(lst_network, lst_search_results, id_cluster_selected = 3)
+lst_search_results[[i]] <- get_clustered_network(lst_network, lst_search_results, id_cluster_selected = 1)
 plot_network(lst_search_results[[i]]$nw_cluster)
 
 df_test_nodes <- lst_search_results[[i]]$nw_cluster$df_nodes
