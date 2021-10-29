@@ -57,4 +57,12 @@ Is representative authorative? Artists having been involved of the most releases
 Display of releases
 * Per cluster order by most interconnecting releases within most authoritative performers
 
+# 2021-10-29 - Using voronoi treemap
+
+Use a voronoi treemap using two levels of aggregation, current level and level below for each cluster
+* Current cluster more or less 10, level below more or less 10
+
+
+
+
 

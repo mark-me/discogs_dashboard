@@ -33,7 +33,7 @@ search_cluster_performer <- function(lst_network, name_performer){
   
   # Drill down the hierarchy until there is closest to _qty_in_cluster_optimum_ performers in a cluster
   qty_in_cluster_optimum <- 10
-  qty_in_cluster <- 0       # Number of performers in a cluster
+  qty_in_cluster <- 0        # Number of performers in a cluster
   id_step <- 1
   stop <- FALSE
   step_size <- 7000          # Initial step size through the hierarchy to speed search up
