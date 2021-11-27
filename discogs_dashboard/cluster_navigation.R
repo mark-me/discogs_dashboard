@@ -224,7 +224,7 @@ get_clustered_network <- function(lst_network, lst_search_results = NA, id_clust
   nw$df_nodes %<>% left_join(lst_search_result$df_cluster, by = "id_node") # Add cluster ID's to nodes
   
   # Set single connecting releases cluster to the performer's cluster ID 
-  nw <-move_single_connecting_releases_to_cluster(nw)
+  nw <- move_single_connecting_releases_to_cluster(nw)
   nw <- add_edge_count(nw)  # Add count of edges per node
   # If a cluster contains only releases that connect other clusters duplicate the nodes across clusters
   nw <- copy_multiple_connecting_releases_to_clusters(nw)
