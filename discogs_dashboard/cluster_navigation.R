@@ -51,6 +51,7 @@ get_clusters <- function(res_clustering, id_step = NA, id_cluster_selected = NA)
                         id_cluster = id_cluster,
                         is_cluster_visible = is_visible)
   )
+  
   return(lst_search)
 }
 

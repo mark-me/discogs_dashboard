@@ -61,8 +61,15 @@ Display of releases
 
 Use a voronoi treemap using two levels of aggregation, current level and level below for each cluster
 * Current cluster more or less 10, level below more or less 10
+* merge all clusters that have 1 performer
+* Set size to artists in collection per cluster
 
+# 2021-12-17 - What to do?
 
+I have to face it: I am seriously stuck... Diagnosis: paralysis by too many choices. No choices can be made on what to do because I want to have everything... I need to check reality, so I set some boundaries by thinking on why I want something new? What does this add to what I can't do now? I now feel I have to make choices on what it is used on. I can make it phone responsive but that seems ridiculous. This interface is NOT a music library browser. It is not a tool you want to use when you have friends or family over. Those are times when you know what you are playing. This and app that helps me research my musical universe. Let's face it: I'm a music addict, so I constantly need to get a new fix of music or I need to rediscover music that smells like it's still fresh. It is a new car or it has a nice new-ish car smell to it. This is an app to explore your musical tastes and expand your knowledge of the universes within it. This is stuff I don't think I want to do it my phone: exploration needs physical space... I explore, so all that is new, I don't have. So it makes sense to let YouTube or similar services to play the music. Ideally I use it on a device that has Bluetooth. That leaves two options: tablets and laptops (and Chrome books). All have browsers: so it's a web app. You can use a desktop, but the bluetooth option is muddy..... But when I sit at my desktop I have decent enough speakers.
 
+# 2021-12-28
 
+Chosen approach: create hierarchy from root to leaves and put it in a relationship table (export to JSON) and do a similar exercise from leaves to root.
 
+Use this D3.js as a starting point for visualization: [https://observablehq.com/@d3/zoomable-treemap]
