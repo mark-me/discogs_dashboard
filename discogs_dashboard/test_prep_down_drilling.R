@@ -25,12 +25,28 @@ lst_search_results[[i]] <- get_clustered_network(lst_network, lst_search_results
 
 plot_network(lst_search_results[[i]]$nw_cluster)
 
-id_clusters <- unique(lst_search_results[[i]]$nw_  $id_cluster)
+
+# Start with a top layer (closest to the root), add the nodes and the information to a data frame called 'df_zoom', set as a 0 as the parent id
+lst_search <- get_clustered_network(lst_network, lst_search_results = NA, id_cluster_selected = NA)
+df_zoom <- lst_search$nw_cluster$df_nodes %>% 
+  mutate(id_parent = "0",
+         id_zoom = 1)
+
+# For each node in the layer with id_node:
+#   find the underlying nodes
+#   Add the current layer to the data frame zoom with the parent id, set the parent id to id_node
+
+id_clusters <- unique(df_zoom$id_cluster)
 i <- 2
 for(id_cluster in id_clusters){
   
-  lst_search_results[[i]] <- get_clustered_network(lst_network, lst_search_results, id_cluster_selected = id_cluster)
-  i <- i + 1
+  lst_search <- get_clustered_network(lst_network, lst_search_results, id_cluster_selected = id_cluster)
+  df_zoom <- bind_rows(
+    df_zoom,
+    lst_search$nw_cluster$df_nodes %>% 
+      mutate(id_parent = as.character(id_cluster),
+             id_zoom = i)
+  )
 }
 plot_network(lst_search_results[[i-11]]$nw_cluster)
 
